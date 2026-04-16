@@ -763,25 +763,30 @@ function ghHeaders(cfg) {
   return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${cfg.token}`, 'X-GitHub-Api-Version': '2022-11-28' };
 }
 
-// Fetch a single file from GitHub, returns { json, sha }
-// Uses download_url for large files (>1MB GitHub API limit)
+// Fetch a small file (<1MB) from GitHub API, returns { json, sha }
 async function ghFetchFile(cfg, filename) {
   const metaRes = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
   if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status} (${filename})`);
   const meta = await metaRes.json();
-  let decoded;
-  if (meta.content && meta.content.trim()) {
-    // Small file: use inline base64 content
-    decoded = JSON.parse(atob(meta.content.replace(/\n/g, '')));
-  } else if (meta.download_url) {
-    // Large file (>1MB): fetch raw content via download_url
-    const rawRes = await fetch(meta.download_url);
-    if (!rawRes.ok) throw new Error(`下载失败 HTTP ${rawRes.status} (${filename})`);
-    decoded = await rawRes.json();
-  } else {
-    throw new Error(`无法获取文件内容 (${filename})`);
-  }
+  const decoded = JSON.parse(atob(meta.content.replace(/\n/g, '')));
   return { json: decoded, sha: meta.sha };
+}
+
+// Fetch districts.geojson directly as static file (too large for GitHub API)
+async function ghFetchDistricts(cfg) {
+  // Try same-origin first (works on GitHub Pages)
+  const urls = [
+    'districts.geojson',
+    `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/main/${ghFilePath(cfg,'districts.geojson')}`,
+    `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/master/${ghFilePath(cfg,'districts.geojson')}`
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) { return await res.json(); }
+    } catch(e) { continue; }
+  }
+  throw new Error('无法加载 districts.geojson，请检查仓库分支名（main/master）');
 }
 
 // Write a file to GitHub (auto-fetches sha if missing)
@@ -823,12 +828,12 @@ async function fetchAllDataThenInit() {
     ghSetStatus('warn', '正在从 GitHub 加载数据…');
     showToast('☁️ 正在从 GitHub 加载数据…');
     try {
-      const [dR, pR, ptR] = await Promise.all([
-        ghFetchFile(cfg, 'districts.geojson'),
+      const [distGJ, pR, ptR] = await Promise.all([
+        ghFetchDistricts(cfg),
         ghFetchFile(cfg, 'cluster.geojson'),
         ghFetchFile(cfg, 'cluster_point.geojson')
       ]);
-      _DIST_DATA = dR.json;  _ghSha.dist = dR.sha;
+      _DIST_DATA = distGJ;
       _POLY_DATA = pR.json;  _ghSha.poly = pR.sha;
       _PT_DATA   = ptR.json; _ghSha.pt   = ptR.sha;
       ghSetStatus('ok', `已连接 ${cfg.owner}/${cfg.repo}`);
@@ -861,12 +866,12 @@ async function ghPullAll() {
   const cfg = ghGetConfig(); if (!cfg) return;
   ghSetStatus('warn', '正在拉取…');
   try {
-    const [dR, pR, ptR] = await Promise.all([
-      ghFetchFile(cfg, 'districts.geojson'),
+    const [distGJ, pR, ptR] = await Promise.all([
+      ghFetchDistricts(cfg),
       ghFetchFile(cfg, 'cluster.geojson'),
       ghFetchFile(cfg, 'cluster_point.geojson')
     ]);
-    _DIST_DATA = dR.json;  _ghSha.dist = dR.sha;
+    _DIST_DATA = distGJ;
     _POLY_DATA = pR.json;  _ghSha.poly = pR.sha;
     _PT_DATA   = ptR.json; _ghSha.pt   = ptR.sha;
     // Reload map layers
@@ -968,12 +973,10 @@ async function ghSaveConfig() {
   closeGhModal();
   ghSetStatus('warn', '正在验证连接…');
   try {
-    const [dR, pR, ptR] = await Promise.all([
-      ghFetchFile(cfg, 'districts.geojson').catch(() => null),
+    const [pR, ptR] = await Promise.all([
       ghFetchFile(cfg, 'cluster.geojson'),
       ghFetchFile(cfg, 'cluster_point.geojson')
     ]);
-    if (dR)  _ghSha.dist = dR.sha;
     _ghSha.poly = pR.sha;
     _ghSha.pt   = ptR.sha;
     ghSetStatus('ok', `已连接 ${cfg.owner}/${cfg.repo}`);
