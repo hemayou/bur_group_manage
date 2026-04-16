@@ -767,18 +767,21 @@ function ghHeaders(cfg) {
   return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${cfg.token}`, 'X-GitHub-Api-Version': '2022-11-28' };
 }
 
-// Fetch a small file (<1MB) from GitHub API, returns { json, sha }
+// Fetch file metadata (sha) + content via download_url (no base64 issues)
 async function ghFetchFile(cfg, filename) {
+  // Step 1: get metadata (sha + download_url)
   const metaRes = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
   if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status} (${filename})`);
   const meta = await metaRes.json();
-  const decoded = JSON.parse(atob(meta.content.replace(/\n/g, '')));
-  return { json: decoded, sha: meta.sha };
+  // Step 2: fetch raw content via download_url (bypasses base64 entirely)
+  const rawRes = await fetch(meta.download_url);
+  if (!rawRes.ok) throw new Error(`下载失败 HTTP ${rawRes.status} (${filename})`);
+  const json = await rawRes.json();
+  return { json, sha: meta.sha };
 }
 
-// Fetch districts.geojson directly as static file (too large for GitHub API)
+// Fetch districts.geojson as static file (too large for GitHub API)
 async function ghFetchDistricts(cfg) {
-  // Try same-origin first (works on GitHub Pages)
   const urls = [
     'districts.geojson',
     `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/main/${ghFilePath(cfg,'districts.geojson')}`,
@@ -787,31 +790,43 @@ async function ghFetchDistricts(cfg) {
   for (const url of urls) {
     try {
       const res = await fetch(url);
-      if (res.ok) { return await res.json(); }
+      if (res.ok) return await res.json();
     } catch(e) { continue; }
   }
-  throw new Error('无法加载 districts.geojson，请检查仓库分支名（main/master）');
+  throw new Error('无法加载 districts.geojson');
 }
 
 // Write a file to GitHub (auto-fetches sha if missing)
 async function ghPutFile(cfg, filename, geoJSON, sha) {
-  // If sha unknown, fetch it first to avoid "sha wasn't supplied" error
+  // If sha unknown, fetch it first
   if (!sha) {
-    try { const r = await ghFetchFile(cfg, filename); sha = r.sha; } catch (e) { /* new file */ }
+    try {
+      const metaRes = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
+      if (metaRes.ok) { const m = await metaRes.json(); sha = m.sha; }
+    } catch (e) { /* new file, no sha needed */ }
   }
-  // Use TextEncoder for correct UTF-8 base64 encoding (supports Chinese characters)
+  // Encode: UTF-8 bytes -> base64 (handles all Chinese characters correctly)
   const jsonStr = JSON.stringify(geoJSON, null, 2);
   const utf8Bytes = new TextEncoder().encode(jsonStr);
-  const b64 = btoa(Array.from(utf8Bytes, b => String.fromCharCode(b)).join(''));
+  let b64 = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < utf8Bytes.length; i += chunkSize) {
+    b64 += btoa(String.fromCharCode(...utf8Bytes.slice(i, i + chunkSize)));
+  }
   const body = JSON.stringify({
     message: `[地图同步] 更新 ${filename}`,
     content: b64,
     ...(sha ? { sha } : {})
   });
   const res = await fetch(ghApiUrl(cfg, filename), {
-    method: 'PUT', headers: { ...ghHeaders(cfg), 'Content-Type': 'application/json' }, body
+    method: 'PUT',
+    headers: { ...ghHeaders(cfg), 'Content-Type': 'application/json' },
+    body
   });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.message || `HTTP ${res.status}`);
+  }
   return (await res.json()).content.sha;
 }
 
