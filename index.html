@@ -2,6 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>北京城市更新组团管理系统</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -496,7 +499,8 @@ body.viewer-mode .viewer-banner{display:block;}
         </div>
         <button class="btn btn-blue edit-only" onclick="openGhModal()" style="margin-bottom:6px;width:100%">⚙️ 配置 GitHub 仓库</button>
         <button class="btn btn-green edit-only" id="btn-gh-pull" onclick="ghPullAll()" style="margin-bottom:6px;width:100%" disabled>⬇️ 拉取 GitHub 最新数据</button>
-        <button class="btn btn-blue edit-only" id="btn-gh-push" onclick="ghPushAll()" style="width:100%" disabled>⬆️ 推送当前数据到 GitHub</button>
+        <button class="btn btn-blue edit-only" id="btn-gh-push" onclick="ghPushAll()" style="width:100%;margin-bottom:6px" disabled>⬆️ 推送当前数据到 GitHub</button>
+        <button class="btn" style="width:100%;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#f59e0b;border-radius:9px;padding:8px;font-size:12px;cursor:pointer;" id="btn-gh-force" onclick="ghForcePush()" disabled>🔄 强制推送（重置sha后覆盖）</button>
         <div class="sub-ttl" style="margin-top:14px;">本地文件上传替换</div>
         <div class="fl-lbl">上传组团面 GeoJSON（替换现有数据）</div>
         <div class="upload-area" onclick="document.getElementById('up-poly').click()">
@@ -821,8 +825,10 @@ function ghSetStatus(state, msg) {
   const connected = state === 'ok' || state === 'warn';
   const pull = document.getElementById('btn-gh-pull');
   const push = document.getElementById('btn-gh-push');
+  const force = document.getElementById('btn-gh-force');
   if (pull) pull.disabled = !connected;
   if (push) push.disabled = !connected;
+  if (force) force.disabled = !connected;
 }
 
 // ── Main entry: called after login ──
@@ -920,6 +926,26 @@ async function ghPushAll() {
   } catch (err) {
     ghSetStatus('err', `推送失败：${err.message}`);
     showToast('❌ 推送失败：' + err.message);
+  }
+}
+
+// Force push: always re-fetch sha before pushing (recovery tool)
+async function ghForcePush() {
+  const cfg = ghGetConfig(); if (!cfg) return;
+  ghSetStatus('warn', '正在重置 sha 并强制推送…');
+  try {
+    // Re-fetch both shas fresh from GitHub
+    const [pR, ptR] = await Promise.all([
+      ghFetchFile(cfg, 'cluster.geojson'),
+      ghFetchFile(cfg, 'cluster_point.geojson')
+    ]);
+    _ghSha.poly = pR.sha;
+    _ghSha.pt   = ptR.sha;
+    // Now push with fresh shas
+    await ghPushAll();
+  } catch (err) {
+    ghSetStatus('err', `强制推送失败：${err.message}`);
+    showToast('❌ 强制推送失败：' + err.message);
   }
 }
 
