@@ -1575,11 +1575,13 @@ function uploadGeoJSON(layerType, input){
           polyFeats=[];nextPolyId=1;
           gj.features.forEach(f=>addPolyFeat(f,f.properties||{}));
           refreshPolyLabels();
+          _ghSha.poly=null; // reset sha so next push re-fetches latest from GitHub
         }else{
           ptFeats.forEach(pf=>{ptGroup.removeLayer(pf.marker);if(map.hasLayer(pf.marker))map.removeLayer(pf.marker);});
           ptFeats=[];nextPtId=1;
           gj.features.forEach(f=>addPtFeat(f,f.properties||{}));
           refreshPtLabels();
+          _ghSha.pt=null; // reset sha so next push re-fetches latest from GitHub
         }
         updateStats();
         showToast(`✅ 已成功加载 ${gj.features.length} 个要素`);
