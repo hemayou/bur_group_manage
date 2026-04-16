@@ -909,11 +909,8 @@ async function ghPushAll() {
       crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
       features: ptFeats.map(pf => ({ type: 'Feature', properties: { ...pf.props }, geometry: { type: 'Point', coordinates: [pf.marker.getLatLng().lng, pf.marker.getLatLng().lat] } }))
     };
-    const [polySha, ptSha] = await Promise.all([
-      ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly),
-      ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt)
-    ]);
-    _ghSha.poly = polySha; _ghSha.pt = ptSha;
+    _ghSha.poly = await ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly);
+    _ghSha.pt   = await ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt);
     ghSetStatus('ok', `已推送至 ${cfg.owner}/${cfg.repo}`);
     showToast('✅ 数据已推送到 GitHub');
   } catch (err) {
@@ -939,11 +936,8 @@ function ghAutoSync() {
         crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
         features: ptFeats.map(pf => ({ type: 'Feature', properties: { ...pf.props }, geometry: { type: 'Point', coordinates: [pf.marker.getLatLng().lng, pf.marker.getLatLng().lat] } }))
       };
-      const [polySha, ptSha] = await Promise.all([
-        ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly),
-        ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt)
-      ]);
-      _ghSha.poly = polySha; _ghSha.pt = ptSha;
+      _ghSha.poly = await ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly);
+      _ghSha.pt   = await ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt);
       ghSetStatus('ok', '已自动同步至 GitHub');
     } catch (err) {
       ghSetStatus('err', `自动同步失败：${err.message}`);
