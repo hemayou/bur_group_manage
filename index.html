@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>北京城市更新组团管理系统</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css"/>
+<style>
+:root{
+  --bg:#0c1220;--card:#111827;--surface:#182030;--surface2:#1e2a3a;
+  --border:rgba(255,255,255,.07);
+  --accent:#4f8ef7;--indigo:#6366f1;--teal:#2dd4bf;--amber:#f59e0b;--rose:#f43f5e;--green:#22c55e;
+  --text:#e2e8f0;--muted:#64748b;--label:#94a3b8;
+  --radius:14px;--radius-sm:9px;--top-h:52px;--bar-h:64px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;z-index:9000;
+  background:radial-gradient(ellipse at 60% 30%,#1a1f35 0%,#0c1220 60%);
+  display:flex;align-items:center;justify-content:center;}
+.login-box{background:rgba(24,32,48,.9);backdrop-filter:blur(30px);
+  border:1px solid rgba(79,142,247,.2);border-radius:20px;
+  padding:40px 32px;width:min(360px,92vw);
+  box-shadow:0 24px 80px rgba(0,0,0,.7),0 0 60px rgba(79,142,247,.1);}
+.login-logo{text-align:center;font-size:36px;margin-bottom:12px;}
+.login-title{text-align:center;font-size:18px;font-weight:700;margin-bottom:4px;}
+.login-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:28px;}
+.lf{margin-bottom:16px;}
+.lf label{display:block;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.lf input{width:100%;background:#0f172a;color:var(--text);border:1px solid var(--border);padding:11px 14px;border-radius:10px;font-size:14px;outline:none;transition:border .2s;}
+.lf input:focus{border-color:var(--accent);}
+#login-err{color:#fb7185;font-size:12px;text-align:center;margin:-8px 0 12px;min-height:18px;}
+.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#1d4ed8,var(--accent));color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .2s;}
+.login-btn:active{opacity:.8;}
+.login-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:14px;}
+.login-hint b{color:var(--label);}
+
+/* MAP */
+#map{position:fixed;inset:0;z-index:0;}
+
+/* TOPBAR */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:800;height:var(--top-h);
+  display:flex;align-items:center;gap:8px;padding:0 12px;
+  background:rgba(12,18,32,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);}
+#topbar-logo{font-size:20px;flex-shrink:0;}
+#topbar-title{flex:1;font-size:12.5px;font-weight:700;
+  background:linear-gradient(90deg,#93c5fd,#a78bfa 60%,#5eead4);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.stat-chip{background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:20px;padding:3px 9px;font-size:11px;color:var(--label);white-space:nowrap;}
+.stat-chip b{color:var(--text);font-weight:700;}
+#user-badge{display:flex;align-items:center;gap:4px;background:rgba(99,102,241,.15);
+  border:1px solid rgba(99,102,241,.3);border-radius:20px;padding:3px 9px;
+  font-size:11px;color:#a5b4fc;white-space:nowrap;cursor:pointer;flex-shrink:0;}
+#user-badge:active{opacity:.7;}
+#menu-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.07);
+  border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:17px;flex-shrink:0;color:var(--label);}
+
+/* TOOLBAR */
+#toolbar-wrap{position:fixed;bottom:0;left:0;right:0;z-index:800;
+  display:flex;flex-direction:column;align-items:center;pointer-events:none;}
+#toolbar-handle{pointer-events:all;cursor:pointer;width:44px;height:20px;margin-bottom:-1px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(12,18,32,.88);backdrop-filter:blur(24px);
+  border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;}
+#th-icon{width:28px;height:3px;border-radius:2px;background:var(--muted);transition:transform .3s;}
+#toolbar-bar{pointer-events:all;width:100%;
+  background:rgba(12,18,32,.92);backdrop-filter:blur(24px);
+  border-top:1px solid var(--border);
+  padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));
+  display:flex;gap:5px;overflow-x:auto;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .3s;}
+#toolbar-wrap.collapsed #toolbar-bar{transform:translateY(100%);opacity:0;pointer-events:none;}
+#toolbar-wrap.collapsed #th-icon{transform:rotate(180deg);}
+.act-btn{flex:0 0 auto;min-width:56px;min-height:48px;border-radius:10px;border:none;cursor:pointer;
+  font-size:10px;font-weight:600;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  transition:transform .15s,opacity .15s;-webkit-user-select:none;user-select:none;}
+.act-btn .i{font-size:15px;line-height:1;}
+.act-btn:active{transform:scale(.92);opacity:.8;}
+.act-btn.draw   {background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.22); color:#4ade80;}
+.act-btn.reshape{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.22);color:#93c5fd;}
+.act-btn.move   {background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.22);color:#5eead4;}
+.act-btn.del    {background:rgba(244,63,94,.09);border:1px solid rgba(244,63,94,.2); color:#fb7185;}
+.act-btn.done   {background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--label);}
+.act-btn.active {box-shadow:0 0 0 2px currentColor!important;}
+/* Layer tab selector in toolbar */
+.layer-tab{flex:0 0 auto;display:flex;background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;align-self:center;}
+.ltab{padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);transition:all .2s;white-space:nowrap;}
+.ltab.active{background:var(--accent);color:#fff;}
+
+/* PANEL */
+#panel-overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transition:opacity .3s;}
+#panel-overlay.open{opacity:1;pointer-events:all;}
+#panel{position:fixed;top:0;right:0;bottom:0;z-index:901;width:min(360px,95vw);
+  background:var(--card);transform:translateX(100%);
+  transition:transform .35s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+  box-shadow:-8px 0 40px rgba(0,0,0,.7);border-left:1px solid var(--border);}
+#panel.open{transform:translateX(0);}
+#panel-hdr{flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top,0px));
+  background:linear-gradient(135deg,rgba(12,18,32,1),rgba(30,26,62,1));
+  border-bottom:1px solid var(--border);}
+#panel-hdr-title{flex:1;font-size:14px;font-weight:700;}
+#close-btn{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.07);
+  border:none;color:var(--muted);font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;}
+#panel-body{flex:1;overflow-y:auto;padding:12px;}
+#panel-body::-webkit-scrollbar{width:4px;}
+#panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px;}
+
+/* SECTIONS */
+.sec{background:var(--surface);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden;border:1px solid var(--border);}
+.sec-hdr{padding:10px 13px;display:flex;align-items:center;gap:8px;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--label);
+  -webkit-user-select:none;user-select:none;transition:background .15s;border-bottom:1px solid transparent;}
+.sec-hdr:active{background:var(--surface2);}
+.sec-hdr .s-ico{font-size:14px;}.sec-hdr .chev{margin-left:auto;color:var(--muted);font-size:10px;transition:transform .25s;}
+.sec-hdr.open{border-bottom-color:var(--border);}.sec-hdr.open .chev{transform:rotate(90deg);}
+.sec-body{display:none;padding:13px;}.sec-body.open{display:block;}
+
+/* LAYER ROWS */
+.ly-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);}
+.ly-row:last-of-type{border-bottom:none;}
+.ly-info{flex:1;}.ly-name{font-size:13px;}.ly-sub{font-size:11px;color:var(--muted);}
+.sw{position:relative;display:inline-block;width:42px;height:23px;flex-shrink:0;}
+.sw input{opacity:0;width:0;height:0;}
+.sw-track{position:absolute;inset:0;background:#1e3a5f;border-radius:23px;cursor:pointer;transition:.25s;}
+.sw-track:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#475569;border-radius:50%;transition:.25s;}
+input:checked+.sw-track{background:var(--accent);}
+input:checked+.sw-track:before{transform:translateX(19px);background:#fff;}
+.fl-sel{width:100%;background:#0f172a;color:var(--text);border:1px solid var(--border);
+  padding:7px 10px;border-radius:var(--radius-sm);font-size:12px;margin-top:5px;
+  outline:none;-webkit-appearance:none;}
+.fl-sel:focus{border-color:var(--accent);}
+.fl-lbl{font-size:11px;color:var(--muted);margin-top:10px;margin-bottom:4px;font-weight:500;}
+
+/* STYLE CONTROLS */
+.sub-ttl{font-size:10.5px;color:var(--indigo);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin:4px 0 10px;}
+.c-row{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:11.5px;}
+.c-lbl{width:78px;color:var(--muted);flex-shrink:0;}
+.c-row input[type=color]{width:32px;height:26px;border:none;border-radius:6px;background:#1e293b;padding:2px;cursor:pointer;}
+.c-row input[type=range]{flex:1;accent-color:var(--accent);}
+.c-val{width:28px;text-align:right;color:var(--label);font-size:11px;}
+.c-row select{flex:1;background:#0f172a;color:var(--text);border:1px solid var(--border);padding:5px 8px;border-radius:var(--radius-sm);font-size:11.5px;-webkit-appearance:none;}
+
+/* BUTTONS */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+  padding:10px;border-radius:var(--radius-sm);border:none;cursor:pointer;
+  font-size:13px;font-weight:600;margin-bottom:8px;transition:all .15s;
+  -webkit-user-select:none;user-select:none;}
+.btn:last-child{margin-bottom:0;}.btn:active{transform:scale(.97);opacity:.8;}
+.btn-blue  {background:rgba(79,142,247,.15);color:#93c5fd;border:1px solid rgba(79,142,247,.3);}
+.btn-green {background:rgba(34,197,94,.13); color:#4ade80; border:1px solid rgba(34,197,94,.28);}
+.btn-ghost {background:rgba(255,255,255,.06);color:var(--label);border:1px solid var(--border);}
+.btn-rose  {background:rgba(244,63,94,.12); color:#fb7185; border:1px solid rgba(244,63,94,.25);}
+.btn-amber {background:rgba(245,158,11,.12);color:#fcd34d; border:1px solid rgba(245,158,11,.3);}
+
+/* MODALS */
+.modal{position:fixed;inset:0;z-index:1100;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:none;align-items:flex-end;justify-content:center;}
+@media(min-width:520px){.modal{align-items:center;}}
+.modal.active{display:flex;}
+.m-box{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:520px;
+  padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));
+  max-height:92dvh;overflow-y:auto;border:1px solid var(--border);border-bottom:none;
+  box-shadow:0 -12px 48px rgba(0,0,0,.75);animation:slideUp .28s cubic-bezier(.4,0,.2,1);}
+@media(min-width:520px){.m-box{border-radius:20px;border:1px solid var(--border);padding:24px;max-height:88dvh;}}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.m-drag{width:36px;height:4px;background:rgba(255,255,255,.12);border-radius:4px;margin:0 auto 16px;}
+@media(min-width:520px){.m-drag{display:none;}}
+.m-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.m-close{margin-left:auto;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);
+  border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.fg{margin-bottom:11px;}
+.fg label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+.fg input,.fg select,.fg textarea{width:100%;background:#0f172a;color:var(--text);border:1px solid var(--border);
+  padding:8px 11px;border-radius:var(--radius-sm);font-size:13px;outline:none;transition:border .2s;-webkit-appearance:none;}
+.fg textarea{resize:vertical;min-height:60px;font-family:inherit;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);}
+.fg select option{background:#0f172a;}
+.fg-row{display:flex;gap:8px;}.fg-row .fg{flex:1;}
+.sec-ttl{font-size:11px;color:#6366f1;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+.m-actions{display:flex;gap:8px;margin-top:16px;}
+.m-actions .btn{flex:1;margin:0;}
+
+/* Confirm */
+.confirm-icon{font-size:36px;text-align:center;margin-bottom:8px;}
+.confirm-msg{text-align:center;font-size:14px;color:var(--label);line-height:1.5;margin-bottom:4px;}
+.confirm-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:14px;}
+
+/* Info */
+.i-row{display:flex;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border);}
+.i-row:last-child{border-bottom:none;}
+.i-key{color:var(--muted);font-size:11px;width:130px;flex-shrink:0;font-weight:500;}
+.i-val{color:var(--text);font-size:12.5px;font-weight:500;flex:1;}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+
+/* Point marker styles */
+.pt-icon{border-radius:50%;border:2px solid #fff;cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);transition:transform .15s;}
+.leaflet-marker-icon:hover .pt-icon{transform:scale(1.25);}
+
+/* Toast */
+.toast{position:fixed;bottom:calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 12px);
+  left:50%;transform:translateX(-50%);z-index:1200;
+  background:rgba(30,42,58,.97);color:var(--text);padding:8px 18px;border-radius:22px;
+  font-size:12.5px;font-weight:500;border:1px solid rgba(255,255,255,.1);
+  backdrop-filter:blur(12px);white-space:nowrap;pointer-events:none;
+  animation:fadeInOut 2.4s ease forwards;}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(8px);}
+  15%{opacity:1;transform:translateX(-50%) translateY(0);}
+  75%{opacity:1;}100%{opacity:0;transform:translateX(-50%) translateY(-4px);}}
+
+/* Mode banner */
+#mode-banner{position:fixed;top:calc(var(--top-h)+8px);left:50%;transform:translateX(-50%);
+  z-index:850;backdrop-filter:blur(10px);color:#fff;
+  padding:7px 16px;border-radius:20px;font-size:12.5px;font-weight:600;
+  display:none;white-space:nowrap;pointer-events:none;}
+#draw-hint{position:fixed;top:calc(var(--top-h)+8px);left:50%;transform:translateX(-50%);
+  z-index:850;background:rgba(34,197,94,.9);backdrop-filter:blur(10px);color:#fff;
+  padding:7px 16px;border-radius:20px;font-size:12.5px;font-weight:600;
+  display:none;white-space:nowrap;pointer-events:none;}
+
+/* Viewer mode */
+body.viewer-mode #toolbar-bar{display:none!important;}
+body.viewer-mode #toolbar-handle{display:none!important;}
+body.viewer-mode .edit-only{display:none!important;}
+.viewer-banner{position:fixed;bottom:0;left:0;right:0;z-index:799;
+  background:rgba(30,42,58,.92);backdrop-filter:blur(12px);border-top:1px solid var(--border);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));
+  text-align:center;font-size:12px;color:var(--muted);display:none;}
+body.viewer-mode .viewer-banner{display:block;}
+
+/* Vertex handles */
+.leaflet-editing-icon{border-radius:50%!important;background:#fff!important;
+  border:2px solid rgba(79,142,247,.9)!important;width:10px!important;height:10px!important;
+  margin-left:-5px!important;margin-top:-5px!important;
+  box-shadow:0 0 6px rgba(79,142,247,.6)!important;}
+.leaflet-touch-icon{border-radius:50%!important;background:rgba(79,142,247,.3)!important;border:1px solid rgba(79,142,247,.5)!important;}
+.leaflet-div-icon{background:transparent!important;border:none!important;overflow:visible!important;}
+.map-lbl{background:transparent!important;border:none!important;overflow:visible!important;}
+.map-lbl div,.map-lbl span{pointer-events:none;}
+
+/* Tooltip */
+.d-tip{background:rgba(15,23,42,.88)!important;border:1px solid rgba(79,142,247,.25)!important;
+  color:#93c5fd!important;border-radius:8px!important;font-size:12px!important;box-shadow:none!important;}
+.leaflet-popup-content-wrapper{background:rgba(17,26,42,.97);border:1px solid var(--border);border-radius:12px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.6);}
+.leaflet-popup-content{margin:10px 14px;}
+.leaflet-popup-tip{background:rgba(17,26,42,.97);}
+
+/* Basemap selector */
+#basemap-bar{position:fixed;top:calc(var(--top-h)+8px);right:54px;z-index:801;display:flex;flex-direction:column;gap:4px;align-items:flex-end;}
+.bm-btn{background:rgba(12,18,32,.88);backdrop-filter:blur(10px);border:1px solid var(--border);
+  border-radius:9px;padding:7px 14px;font-size:13px;color:var(--label);cursor:pointer;white-space:nowrap;text-align:right;transition:all .2s;}
+.bm-btn.active{background:rgba(79,142,247,.2);border-color:rgba(79,142,247,.5);color:#93c5fd;}
+.bm-btn:active{opacity:.7;}
+#bm-toggle{width:38px;height:38px;border-radius:10px;background:rgba(12,18,32,.88);backdrop-filter:blur(10px);
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:20px;cursor:pointer;margin-left:auto;}
+#bm-list{display:none;flex-direction:column;gap:4px;}
+#bm-list.open{display:flex;}
+
+/* Upload area */
+.upload-area{border:2px dashed rgba(79,142,247,.3);border-radius:10px;padding:16px;
+  text-align:center;cursor:pointer;transition:all .2s;color:var(--muted);font-size:12px;}
+.upload-area:hover{border-color:var(--accent);color:var(--label);}
+.upload-area input{display:none;}
+
+/* ── GitHub Sync UI ── */
+.gh-status{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:11.5px;margin-bottom:8px;}
+.gh-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s;}
+.gh-dot.ok{background:#22c55e;box-shadow:0 0 6px #22c55e;}
+.gh-dot.warn{background:#f59e0b;box-shadow:0 0 6px #f59e0b;}
+.gh-dot.err{background:#f43f5e;box-shadow:0 0 6px #f43f5e;}
+.gh-dot.idle{background:var(--muted);}
+.gh-status-txt{flex:1;color:var(--label);font-size:11px;}
+/* GitHub Config Modal */
+.gh-modal-wrap{position:fixed;inset:0;z-index:3100;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(8px);}
+.gh-modal-wrap.hidden{display:none;}
+.gh-box{background:var(--card);border:1px solid rgba(79,142,247,.25);border-radius:18px;
+  padding:28px 24px;width:min(420px,94vw);box-shadow:0 24px 80px rgba(0,0,0,.7);}
+.gh-box h3{font-size:16px;font-weight:700;margin-bottom:6px;color:var(--text);}
+.gh-box .gh-sub{font-size:11.5px;color:var(--muted);margin-bottom:20px;line-height:1.55;}
+.gh-field{margin-bottom:13px;}
+.gh-field label{display:block;font-size:10.5px;color:var(--muted);font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.gh-field input{width:100%;background:#0f172a;color:var(--text);border:1px solid var(--border);
+  border-radius:8px;padding:9px 12px;font-size:13px;}
+.gh-field input:focus{outline:none;border-color:var(--accent);}
+.gh-field input[type=password]{font-family:monospace;letter-spacing:.05em;}
+.gh-hint{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.gh-modal-btns{display:flex;gap:8px;margin-top:6px;}
+.gh-modal-btns .btn{flex:1;}
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">🗺</div>
+    <div class="login-title">北京城市更新组团管理系统</div>
+    <div class="login-sub">请使用账号登录</div>
+    <div class="lf"><label>用户名</label><input type="text" id="inp-user" placeholder="请输入用户名" autocomplete="username"></div>
+    <div class="lf"><label>密码</label><input type="password" id="inp-pass" placeholder="请输入密码" autocomplete="current-password"></div>
+    <div id="login-err"></div>
+    <button class="login-btn" onclick="doLogin()">登 录</button>
+    <div class="login-hint">管理员账号：<b>admin / xpc / lyj / wzq / mf</b></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+<div id="map"></div>
+<div id="draw-hint">📍 点击绘制顶点 · 双击完成</div>
+<div id="mode-banner"></div>
+
+<!-- Basemap switcher -->
+<div id="basemap-bar">
+  <div id="bm-toggle" onclick="toggleBmList()" title="切换底图">🗾</div>
+  <div id="bm-list">
+    <div class="bm-btn active" onclick="switchBasemap('ofm')"  id="bm-ofm">🗺 矢量（OpenFreeMap）</div>
+    <div class="bm-btn" onclick="switchBasemap('esri-sat')"    id="bm-esri-sat">🛰 ESRI 卫星影像</div>
+    <div class="bm-btn" onclick="switchBasemap('esri-topo')"   id="bm-esri-topo">🏔 ESRI Topo</div>
+    <div class="bm-btn" onclick="switchBasemap('esri-street')" id="bm-esri-street">🏙 ESRI 街道图</div>
+    <div class="bm-btn" onclick="switchBasemap('carto-light')" id="bm-carto-light">☀️ CartoDB Light</div>
+    <div class="bm-btn" onclick="switchBasemap('carto-dark')"  id="bm-carto-dark">🌑 CartoDB Dark</div>
+  </div>
+</div>
+
+<!-- Top Bar -->
+<div id="topbar">
+  <div id="topbar-logo">🗺</div>
+  <div id="topbar-title">北京城市更新组团管理系统</div>
+  <div class="stat-chip">面 <b id="stat-poly">0</b></div>
+  <div class="stat-chip">点 <b id="stat-pt">0</b></div>
+  <div id="user-badge" onclick="doLogout()">👤 <span id="user-name-badge"></span> ⏻</div>
+  <button id="menu-btn" onclick="openPanel()">☰</button>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar-wrap">
+  <div id="toolbar-handle" onclick="toggleToolbar()"><div id="th-icon"></div></div>
+  <div id="toolbar-bar">
+    <div class="layer-tab">
+      <div class="ltab active" id="tab-poly" onclick="setActiveLayer('poly')">🔷 组团面</div>
+      <div class="ltab" id="tab-pt" onclick="setActiveLayer('pt')">📍 组团点</div>
+    </div>
+    <button class="act-btn draw"    id="btn-draw"    onclick="startDraw()"><span class="i">✏️</span>绘制</button>
+    <button class="act-btn reshape" id="btn-reshape" onclick="startEdit()"><span class="i">⬡</span>编辑形状</button>
+    <button class="act-btn move"    id="btn-move"    onclick="startMove()"><span class="i">✥</span>平移</button>
+    <button class="act-btn del"     id="btn-del"     onclick="startDelete()"><span class="i">🗑</span>删除</button>
+    <button class="act-btn done"    id="btn-done"    onclick="stopEditing(true)"><span class="i">✓</span>完成</button>
+  </div>
+</div>
+
+<!-- Panel Overlay -->
+<div id="panel-overlay" onclick="closePanel()"></div>
+<div id="panel">
+  <div id="panel-hdr">
+    <span style="font-size:18px;">⚙️</span>
+    <div id="panel-hdr-title">图层与样式</div>
+    <button id="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div id="panel-body">
+
+    <!-- Layers -->
+    <div class="sec">
+      <div class="sec-hdr open" onclick="toggleSec(this)"><span class="s-ico">📂</span>图层控制<span class="chev">›</span></div>
+      <div class="sec-body open">
+        <div class="ly-row">
+          <div class="ly-info"><div class="ly-name">行政区界</div><div class="ly-sub">16区边界</div></div>
+          <label class="sw"><input type="checkbox" id="sw-dist" checked onchange="toggleLayer('dist',this.checked)"><span class="sw-track"></span></label>
+        </div>
+        <div class="ly-row">
+          <div class="ly-info"><div class="ly-name">城市更新组团面</div><div class="ly-sub">多边形要素</div></div>
+          <label class="sw"><input type="checkbox" id="sw-poly" checked onchange="toggleLayer('poly',this.checked)"><span class="sw-track"></span></label>
+        </div>
+        <div class="ly-row">
+          <div class="ly-info"><div class="ly-name">城市更新组团点</div><div class="ly-sub">点要素</div></div>
+          <label class="sw"><input type="checkbox" id="sw-pt" checked onchange="toggleLayer('pt',this.checked)"><span class="sw-track"></span></label>
+        </div>
+        <div class="fl-lbl">行政区标注字段</div>
+        <select class="fl-sel" id="dist-lbl-f" onchange="refreshDistLabels()">
+          <option value="">不显示</option><option value="county" selected>区名</option><option value="province">省名</option>
+        </select>
+        <div class="fl-lbl">组团面标注字段</div>
+        <select class="fl-sel" id="poly-lbl-f" onchange="refreshPolyLabels()">
+          <option value="">不显示</option>
+          <option value="组团编号" selected>组团编号</option>
+          <option value="组团名称">组团名称</option>
+          <option value="所属行政区">所属行政区</option>
+          <option value="范围是否稳定">范围是否稳定</option>
+        </select>
+        <div class="fl-lbl">组团点标注字段</div>
+        <select class="fl-sel" id="pt-lbl-f" onchange="refreshPtLabels()">
+          <option value="">不显示</option>
+          <option value="组团编号" selected>组团编号</option>
+          <option value="组团名称">组团名称</option>
+          <option value="谋划1.0-工作进度">谋划1.0进度</option>
+          <option value="谋划2.0-工作进度">谋划2.0进度</option>
+          <option value="片区策划-工作进度">片区策划进度</option>
+          <option value="跟踪人">跟踪人</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Label Style -->
+    <div class="sec">
+      <div class="sec-hdr" onclick="toggleSec(this)"><span class="s-ico">🔤</span>标注样式<span class="chev">›</span></div>
+      <div class="sec-body">
+        <div class="sub-ttl">行政区标注</div>
+        <div class="c-row"><span class="c-lbl">字体颜色</span><input type="color" id="dl-tc" value="#93c5fd" oninput="refreshDistLabels()"></div>
+        <div class="c-row"><span class="c-lbl">字号</span><input type="range" id="dl-ts" min="9" max="20" step="1" value="12" oninput="refreshDistLabels();document.getElementById('dl-tsv').textContent=this.value+'px'"><span class="c-val" id="dl-tsv">12px</span></div>
+        <div class="c-row"><span class="c-lbl">粗细</span><select id="dl-tw" onchange="refreshDistLabels()"><option value="400">常规</option><option value="600">半粗</option><option value="700" selected>粗体</option></select></div>
+        <div class="c-row"><span class="c-lbl">开启衬底</span><label class="sw"><input type="checkbox" id="dl-buf" onchange="refreshDistLabels();document.getElementById('dl-buf-opts').style.display=this.checked?'block':'none'"><span class="sw-track"></span></label></div>
+        <div id="dl-buf-opts" style="display:none;">
+          <div class="c-row"><span class="c-lbl">衬底颜色</span><input type="color" id="dl-bc" value="#0f172a" oninput="refreshDistLabels()"></div>
+          <div class="c-row"><span class="c-lbl">透明度</span><input type="range" id="dl-bo" min="0" max="1" step="0.05" value="0.7" oninput="refreshDistLabels();document.getElementById('dl-bov').textContent=this.value"><span class="c-val" id="dl-bov">0.70</span></div>
+          <div class="c-row"><span class="c-lbl">圆角</span><input type="range" id="dl-br" min="0" max="12" step="1" value="4" oninput="refreshDistLabels();document.getElementById('dl-brv').textContent=this.value+'px'"><span class="c-val" id="dl-brv">4px</span></div>
+        </div>
+        <div class="sub-ttl" style="margin-top:14px;">组团面标注</div>
+        <div class="c-row"><span class="c-lbl">字体颜色</span><input type="color" id="pl-tc" value="#e2e8f0" oninput="refreshPolyLabels()"></div>
+        <div class="c-row"><span class="c-lbl">字号</span><input type="range" id="pl-ts" min="9" max="20" step="1" value="11" oninput="refreshPolyLabels();document.getElementById('pl-tsv').textContent=this.value+'px'"><span class="c-val" id="pl-tsv">11px</span></div>
+        <div class="c-row"><span class="c-lbl">粗细</span><select id="pl-tw" onchange="refreshPolyLabels()"><option value="400">常规</option><option value="600" selected>半粗</option><option value="700">粗体</option></select></div>
+        <div class="c-row"><span class="c-lbl">开启衬底</span><label class="sw"><input type="checkbox" id="pl-buf" onchange="refreshPolyLabels();document.getElementById('pl-buf-opts').style.display=this.checked?'block':'none'"><span class="sw-track"></span></label></div>
+        <div id="pl-buf-opts" style="display:none;">
+          <div class="c-row"><span class="c-lbl">衬底颜色</span><input type="color" id="pl-bc" value="#1e1b4b" oninput="refreshPolyLabels()"></div>
+          <div class="c-row"><span class="c-lbl">透明度</span><input type="range" id="pl-bo" min="0" max="1" step="0.05" value="0.7" oninput="refreshPolyLabels();document.getElementById('pl-bov').textContent=this.value"><span class="c-val" id="pl-bov">0.70</span></div>
+          <div class="c-row"><span class="c-lbl">圆角</span><input type="range" id="pl-br" min="0" max="12" step="1" value="4" oninput="refreshPolyLabels();document.getElementById('pl-brv').textContent=this.value+'px'"><span class="c-val" id="pl-brv">4px</span></div>
+        </div>
+        <div class="sub-ttl" style="margin-top:14px;">组团点标注</div>
+        <div class="c-row"><span class="c-lbl">字体颜色</span><input type="color" id="ptl-tc" value="#fde68a" oninput="refreshPtLabels()"></div>
+        <div class="c-row"><span class="c-lbl">字号</span><input type="range" id="ptl-ts" min="9" max="20" step="1" value="11" oninput="refreshPtLabels();document.getElementById('ptl-tsv').textContent=this.value+'px'"><span class="c-val" id="ptl-tsv">11px</span></div>
+        <div class="c-row"><span class="c-lbl">粗细</span><select id="ptl-tw" onchange="refreshPtLabels()"><option value="400">常规</option><option value="600" selected>半粗</option><option value="700">粗体</option></select></div>
+        <div class="c-row"><span class="c-lbl">开启衬底</span><label class="sw"><input type="checkbox" id="ptl-buf" onchange="refreshPtLabels();document.getElementById('ptl-buf-opts').style.display=this.checked?'block':'none'"><span class="sw-track"></span></label></div>
+        <div id="ptl-buf-opts" style="display:none;">
+          <div class="c-row"><span class="c-lbl">衬底颜色</span><input type="color" id="ptl-bc" value="#1c1917" oninput="refreshPtLabels()"></div>
+          <div class="c-row"><span class="c-lbl">透明度</span><input type="range" id="ptl-bo" min="0" max="1" step="0.05" value="0.75" oninput="refreshPtLabels();document.getElementById('ptl-bov').textContent=this.value"><span class="c-val" id="ptl-bov">0.75</span></div>
+          <div class="c-row"><span class="c-lbl">圆角</span><input type="range" id="ptl-br" min="0" max="12" step="1" value="4" oninput="refreshPtLabels();document.getElementById('ptl-brv').textContent=this.value+'px'"><span class="c-val" id="ptl-brv">4px</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Layer Style -->
+    <div class="sec">
+      <div class="sec-hdr" onclick="toggleSec(this)"><span class="s-ico">🎨</span>图层样式<span class="chev">›</span></div>
+      <div class="sec-body">
+        <div class="sub-ttl">行政区</div>
+        <div class="c-row"><span class="c-lbl">填充颜色</span><input type="color" id="df-c" value="#3b82f6" oninput="applyDistStyle()"></div>
+        <div class="c-row"><span class="c-lbl">填充透明度</span><input type="range" id="df-o" min="0" max="1" step="0.05" value="0.07" oninput="applyDistStyle();document.getElementById('df-ov').textContent=this.value"><span class="c-val" id="df-ov">0.07</span></div>
+        <div class="c-row"><span class="c-lbl">边线颜色</span><input type="color" id="dl-c" value="#60a5fa" oninput="applyDistStyle()"></div>
+        <div class="c-row"><span class="c-lbl">边线线宽</span><input type="range" id="dl-w" min="0.5" max="6" step="0.5" value="1.5" oninput="applyDistStyle();document.getElementById('dl-wv').textContent=this.value"><span class="c-val" id="dl-wv">1.5</span></div>
+        <div class="sub-ttl" style="margin-top:14px;">组团面</div>
+        <div class="c-row"><span class="c-lbl">填充颜色</span><input type="color" id="pf-c" value="#818cf8" oninput="applyPolyStyle()"></div>
+        <div class="c-row"><span class="c-lbl">填充透明度</span><input type="range" id="pf-o" min="0" max="1" step="0.05" value="0.3" oninput="applyPolyStyle();document.getElementById('pf-ov').textContent=this.value"><span class="c-val" id="pf-ov">0.30</span></div>
+        <div class="c-row"><span class="c-lbl">边线颜色</span><input type="color" id="pl-c" value="#a5b4fc" oninput="applyPolyStyle()"></div>
+        <div class="c-row"><span class="c-lbl">边线线宽</span><input type="range" id="pl-w" min="0.5" max="6" step="0.5" value="2" oninput="applyPolyStyle();document.getElementById('pl-wv').textContent=this.value"><span class="c-val" id="pl-wv">2</span></div>
+        <div class="sub-ttl" style="margin-top:14px;">组团点</div>
+        <div class="c-row"><span class="c-lbl">点颜色</span><input type="color" id="pt-c" value="#f59e0b" oninput="applyPtStyle()"></div>
+        <div class="c-row"><span class="c-lbl">点大小</span><input type="range" id="pt-s" min="6" max="28" step="1" value="12" oninput="applyPtStyle();document.getElementById('pt-sv').textContent=this.value"><span class="c-val" id="pt-sv">12</span></div>
+        <div class="c-row"><span class="c-lbl">边框颜色</span><input type="color" id="pt-bc" value="#ffffff" oninput="applyPtStyle()"></div>
+        <div class="c-row"><span class="c-lbl">边框宽度</span><input type="range" id="pt-bw" min="0" max="5" step="0.5" value="2" oninput="applyPtStyle();document.getElementById('pt-bwv').textContent=this.value"><span class="c-val" id="pt-bwv">2</span></div>
+      </div>
+    </div>
+
+    <!-- Data Management -->
+    <div class="sec edit-only">
+      <div class="sec-hdr" onclick="toggleSec(this)"><span class="s-ico">💾</span>数据管理<span class="chev">›</span></div>
+      <div class="sec-body">
+        <div class="sub-ttl">下载数据</div>
+        <button class="btn btn-blue edit-only" onclick="dlPoly()">⬇️ 下载组团面数据（GeoJSON）</button>
+        <button class="btn btn-blue edit-only" onclick="dlPt()">⬇️ 下载组团点数据（GeoJSON）</button>
+        <button class="btn btn-ghost edit-only" onclick="dlDist()">⬇️ 下载行政区数据（GeoJSON）</button>
+        <div class="sub-ttl" style="margin-top:14px;">☁️ GitHub 数据同步</div>
+        <div class="gh-status" id="gh-status-bar">
+          <div class="gh-dot idle" id="gh-dot"></div>
+          <span class="gh-status-txt" id="gh-status-txt">未配置 GitHub 同步</span>
+        </div>
+        <button class="btn btn-blue edit-only" onclick="openGhModal()" style="margin-bottom:6px;width:100%">⚙️ 配置 GitHub 仓库</button>
+        <button class="btn btn-green edit-only" id="btn-gh-pull" onclick="ghPullAll()" style="margin-bottom:6px;width:100%" disabled>⬇️ 拉取 GitHub 最新数据</button>
+        <button class="btn btn-blue edit-only" id="btn-gh-push" onclick="ghPushAll()" style="width:100%" disabled>⬆️ 推送当前数据到 GitHub</button>
+        <div class="sub-ttl" style="margin-top:14px;">本地文件上传替换</div>
+        <div class="fl-lbl">上传组团面 GeoJSON（替换现有数据）</div>
+        <div class="upload-area" onclick="document.getElementById('up-poly').click()">
+          📂 点击选择 cluster.geojson 文件
+          <input type="file" id="up-poly" accept=".geojson,.json" onchange="uploadGeoJSON('poly',this)">
+        </div>
+        <div class="fl-lbl" style="margin-top:10px;">上传组团点 GeoJSON（替换现有数据）</div>
+        <div class="upload-area" onclick="document.getElementById('up-pt').click()">
+          📂 点击选择 cluster_point.geojson 文件
+          <input type="file" id="up-pt" accept=".geojson,.json" onchange="uploadGeoJSON('pt',this)">
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Attr Modal: Polygon -->
+<div class="modal" id="poly-modal">
+  <div class="m-box">
+    <div class="m-drag"></div>
+    <div class="m-title"><span id="pm-ico">✏️</span><span id="pm-ttl">编辑组团面属性</span>
+      <button class="m-close" onclick="closePolyModal()">✕</button></div>
+    <div class="fg"><label>组团编号</label><input type="text" id="pm-id" placeholder="如：ZT-001"></div>
+    <div class="fg"><label>组团名称</label><input type="text" id="pm-name"></div>
+    <div class="fg"><label>所属行政区</label>
+      <select id="pm-dist"><option value="">— 请选择 —</option>
+        <option>东城区</option><option>西城区</option><option>朝阳区</option>
+        <option>丰台区</option><option>石景山区</option><option>海淀区</option>
+        <option>门头沟区</option><option>房山区</option><option>通州区</option>
+        <option>顺义区</option><option>昌平区</option><option>大兴区</option>
+        <option>怀柔区</option><option>平谷区</option><option>密云区</option><option>延庆区</option>
+      </select>
+    </div>
+    <div class="fg"><label>属地乡镇/街道/管委会</label><input type="text" id="pm-town"></div>
+    <div class="fg-row">
+      <div class="fg"><label>区政府是否已确认</label>
+        <select id="pm-confirmed"><option value="">—</option><option>是</option><option>否</option></select>
+      </div>
+      <div class="fg"><label>范围是否稳定</label>
+        <select id="pm-stable"><option value="">—</option><option>是</option><option>否</option></select>
+      </div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>创建用户（只读）</label><input type="text" id="pm-cu" readonly></div>
+      <div class="fg"><label>创建时间（只读）</label><input type="text" id="pm-ct" readonly></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>修改用户（只读）</label><input type="text" id="pm-mu" readonly></div>
+      <div class="fg"><label>修改时间（只读）</label><input type="text" id="pm-mt" readonly></div>
+    </div>
+    <div class="m-actions">
+      <button class="btn btn-green" onclick="savePolyAttr()">✅ 保存</button>
+      <button class="btn btn-ghost" onclick="closePolyModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Attr Modal: Point -->
+<div class="modal" id="pt-modal">
+  <div class="m-box">
+    <div class="m-drag"></div>
+    <div class="m-title"><span id="ptm-ico">📍</span><span id="ptm-ttl">编辑组团点属性</span>
+      <button class="m-close" onclick="closePtModal()">✕</button></div>
+
+    <div class="sec-ttl">基本信息</div>
+    <div class="fg-row">
+      <div class="fg"><label>组团编号</label><input type="text" id="ptm-id" placeholder="如：DC-1"></div>
+      <div class="fg"><label>跟踪人</label>
+        <select id="ptm-tracker"><option value="">—</option>
+          <option>游鸿</option><option>徐鹏程</option><option>吴志强</option><option>马芳</option><option>李彦婕</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>组团名称（最多255字）</label><input type="text" id="ptm-name" maxlength="255"></div>
+    <div class="fg"><label>上报名称（最多255字）</label><input type="text" id="ptm-rname" maxlength="255"></div>
+
+    <div class="sec-ttl">谋划1.0</div>
+    <div class="fg-row">
+      <div class="fg"><label>工作进度</label>
+        <select id="ptm-p1"><option value="">—</option>
+          <option>尚未启动</option><option>初步谋划</option><option>已提交成果</option><option>进一步优化</option><option>撤销</option>
+        </select>
+      </div>
+      <div class="fg"><label>资料提交时间</label><input type="date" id="ptm-d1"></div>
+    </div>
+    <div class="fg"><label>状态备注（最多1000字）</label><textarea id="ptm-n1" maxlength="1000" rows="2"></textarea></div>
+
+    <div class="sec-ttl">谋划2.0</div>
+    <div class="fg-row">
+      <div class="fg"><label>工作进度</label>
+        <select id="ptm-p2"><option value="">—</option>
+          <option>尚未启动</option><option>初步谋划</option><option>已提交成果</option><option>进一步优化</option><option>撤销</option>
+        </select>
+      </div>
+      <div class="fg"><label>资料收集时间</label><input type="date" id="ptm-d2"></div>
+    </div>
+    <div class="fg"><label>状态备注（最多1000字）</label><textarea id="ptm-n2" maxlength="1000" rows="2"></textarea></div>
+
+    <div class="sec-ttl">片区策划</div>
+    <div class="fg-row">
+      <div class="fg"><label>工作进度</label>
+        <select id="ptm-p3"><option value="">—</option>
+          <option>尚未启动</option><option>初步谋划</option><option>已提交成果</option><option>进一步优化</option><option>撤销</option>
+        </select>
+      </div>
+      <div class="fg"><label>资料收集时间</label><input type="date" id="ptm-d3"></div>
+    </div>
+    <div class="fg"><label>状态备注（最多1000字）</label><textarea id="ptm-n3" maxlength="1000" rows="2"></textarea></div>
+
+    <div class="sec-ttl">技术团队</div>
+    <div class="fg"><label>技术团队名称（最多255字）</label><input type="text" id="ptm-team" maxlength="255"></div>
+    <div class="fg-row">
+      <div class="fg"><label>技术团队负责人</label><input type="text" id="ptm-leader" placeholder="中文姓名"></div>
+      <div class="fg"><label>联系方式</label><input type="tel" id="ptm-phone" placeholder="手机号" pattern="1[3-9]\d{9}"></div>
+    </div>
+
+    <div class="fg-row">
+      <div class="fg"><label>创建用户（只读）</label><input type="text" id="ptm-cu" readonly></div>
+      <div class="fg"><label>创建时间（只读）</label><input type="text" id="ptm-ct" readonly></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>修改用户（只读）</label><input type="text" id="ptm-mu" readonly></div>
+      <div class="fg"><label>修改时间（只读）</label><input type="text" id="ptm-mt" readonly></div>
+    </div>
+    <div class="m-actions">
+      <button class="btn btn-green" onclick="savePtAttr()">✅ 保存</button>
+      <button class="btn btn-ghost" onclick="closePtModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info Modal -->
+<div class="modal" id="info-modal">
+  <div class="m-box">
+    <div class="m-drag"></div>
+    <div class="m-title" id="info-modal-title">📋 详情<button class="m-close" onclick="closeInfoModal()">✕</button></div>
+    <div id="info-content"></div>
+    <div class="m-actions" style="margin-top:14px;">
+      <button class="btn btn-blue" onclick="editFromInfo()">✏️ 编辑</button>
+      <button class="btn btn-rose" onclick="deleteFromInfo()">🗑 删除</button>
+      <button class="btn btn-ghost" onclick="closeInfoModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal" id="confirm-modal">
+  <div class="m-box" style="max-width:360px;">
+    <div class="m-drag"></div>
+    <div class="confirm-icon" id="confirm-icon">⚠️</div>
+    <div class="confirm-msg" id="confirm-msg">确定执行此操作？</div>
+    <div class="confirm-sub" id="confirm-sub"></div>
+    <div class="m-actions">
+      <button class="btn btn-rose" onclick="confirmOK()">确 定</button>
+      <button class="btn btn-ghost" onclick="confirmCancel()">取 消</button>
+    </div>
+  </div>
+</div>
+
+<div class="viewer-banner">👁 访客模式 — 仅可查看地图，无编辑权限</div>
+</div><!-- end #app -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
+<script>
+// ══ DATA ══
+let _DIST_DATA=null,_POLY_DATA=null,_PT_DATA=null;
+
+// ══ AUTH ══
+const USERS = {
+  'admin': {password:'admin123', displayName:'管理员', role:'admin'},
+  'xpc':   {password:'xpc123',   displayName:'徐鹏程',  role:'admin'},
+  'lyj':   {password:'lyj123',   displayName:'李彦婕',  role:'admin'},
+  'wzq':   {password:'wzq123',   displayName:'吴志强',  role:'admin'},
+  'mf':    {password:'mf123',    displayName:'马芳',    role:'admin'},
+  'viewer':{password:'view123',  displayName:'访客',    role:'viewer'}
+};
+let currentUser=null;
+
+document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('inp-user').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('inp-pass').focus();});
+
+function doLogin(){
+  const u=document.getElementById('inp-user').value.trim();
+  const p=document.getElementById('inp-pass').value;
+  const err=document.getElementById('login-err');
+  if(!USERS[u]||USERS[u].password!==p){err.textContent='用户名或密码错误';document.getElementById('inp-pass').value='';return;}
+  currentUser={...USERS[u],username:u};
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('user-name-badge').textContent=currentUser.displayName;
+  if(currentUser.role==='viewer')document.body.classList.add('viewer-mode');
+  else document.body.classList.remove('viewer-mode');
+  fetchAllDataThenInit();
+}
+function doLogout(){
+  if(!confirm('确定退出登录？'))return;
+  currentUser=null;document.body.classList.remove('viewer-mode');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  ['inp-user','inp-pass'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('login-err').textContent='';
+}
+function isAdmin(){return currentUser&&currentUser.role==='admin';}
+function requireAdmin(){if(!isAdmin()){showToast('🔒 访客模式无编辑权限');return false;}return true;}
+
+// ══ APP INIT ══
+let map, distLayerRef, distGroup, polyGroup, ptGroup;
+let polyLabelLayer, ptLabelLayer, distLabelLayer;
+let polyFeats=[], ptFeats=[], nextPolyId=1, nextPtId=1;
+let distStyle={fillColor:'#3b82f6',fillOpacity:.07,color:'#60a5fa',weight:1.5};
+let polyStyle={fillColor:'#818cf8',fillOpacity:.30,color:'#a5b4fc',weight:2};
+let ptStyle={color:'#f59e0b',size:12,borderColor:'#ffffff',borderWidth:2};
+let editMode=null, activeLayer='poly';
+let _polyAttrCb=null, _polyAttrId=null;
+let _ptAttrCb=null, _ptAttrId=null;
+let _infoId=null, _infoType=null;
+let _confirmCb=null;
+let basemapLayer=null;
+let appReady=false;
+
+function initApp(){
+  if(appReady)return; appReady=true;
+  map=L.map('map',{center:[40.1,116.4],zoom:9,zoomControl:false});
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  distGroup=L.layerGroup().addTo(map);
+  polyGroup=L.layerGroup().addTo(map);
+  ptGroup=L.layerGroup().addTo(map);
+  polyLabelLayer=L.layerGroup().addTo(map);
+  ptLabelLayer=L.layerGroup().addTo(map);
+  distLabelLayer=L.layerGroup().addTo(map);
+  switchBasemap('ofm');
+  if(_DIST_DATA){
+    distLayerRef=L.geoJSON(_DIST_DATA,{style:()=>({...distStyle}),
+      onEachFeature:(f,lyr)=>lyr.bindTooltip('<b>'+f.properties.county+'</b>',{sticky:true,className:'d-tip'})
+    }).addTo(distGroup);
+    map.fitBounds(distLayerRef.getBounds(),{padding:[60,20]});
+    refreshDistLabels();
+  }
+  if(_POLY_DATA)_POLY_DATA.features.forEach(f=>addPolyFeat(f,f.properties));
+  if(_PT_DATA)_PT_DATA.features.forEach(f=>addPtFeat(f,f.properties));
+  refreshPolyLabels();refreshPtLabels();
+}
+
+
+// ══ DATA LOADING & GITHUB SYNC ══
+const GH_CFG_KEY = 'gh_config_v1';
+let _ghSha = { dist: null, poly: null, pt: null };
+
+function ghGetConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_CFG_KEY) || 'null'); } catch { return null; }
+}
+function ghFilePath(cfg, filename) {
+  const p = (cfg.path || '').replace(/^\/|\/$$/g, '');
+  return p ? `${p}/${filename}` : filename;
+}
+function ghApiUrl(cfg, filename) {
+  return `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${ghFilePath(cfg, filename)}`;
+}
+function ghHeaders(cfg) {
+  return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${cfg.token}`, 'X-GitHub-Api-Version': '2022-11-28' };
+}
+
+// Fetch a single file from GitHub, returns { json, sha }
+async function ghFetchFile(cfg, filename) {
+  const res = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
+  if (!res.ok) throw new Error(`HTTP ${res.status} (${filename})`);
+  const data = await res.json();
+  const decoded = JSON.parse(atob(data.content.replace(/\n/g, '')));
+  return { json: decoded, sha: data.sha };
+}
+
+// Write a file to GitHub
+async function ghPutFile(cfg, filename, geoJSON, sha) {
+  const body = JSON.stringify({
+    message: `[地图同步] 更新 ${filename}`,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(geoJSON, null, 2)))),
+    ...(sha ? { sha } : {})
+  });
+  const res = await fetch(ghApiUrl(cfg, filename), {
+    method: 'PUT', headers: { ...ghHeaders(cfg), 'Content-Type': 'application/json' }, body
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+  return (await res.json()).content.sha;
+}
+
+// Update the status indicator in panel
+function ghSetStatus(state, msg) {
+  const dot = document.getElementById('gh-dot');
+  const txt = document.getElementById('gh-status-txt');
+  if (!dot || !txt) return;
+  dot.className = 'gh-dot ' + state;
+  txt.textContent = msg;
+  const connected = state === 'ok' || state === 'warn';
+  const pull = document.getElementById('btn-gh-pull');
+  const push = document.getElementById('btn-gh-push');
+  if (pull) pull.disabled = !connected;
+  if (push) push.disabled = !connected;
+}
+
+// ── Main entry: called after login ──
+async function fetchAllDataThenInit() {
+  const cfg = ghGetConfig();
+  if (cfg && cfg.owner && cfg.repo && cfg.token) {
+    ghSetStatus('warn', '正在从 GitHub 加载数据…');
+    showToast('☁️ 正在从 GitHub 加载数据…');
+    try {
+      const [dR, pR, ptR] = await Promise.all([
+        ghFetchFile(cfg, 'districts.geojson'),
+        ghFetchFile(cfg, 'cluster.geojson'),
+        ghFetchFile(cfg, 'cluster_point.geojson')
+      ]);
+      _DIST_DATA = dR.json;  _ghSha.dist = dR.sha;
+      _POLY_DATA = pR.json;  _ghSha.poly = pR.sha;
+      _PT_DATA   = ptR.json; _ghSha.pt   = ptR.sha;
+      ghSetStatus('ok', `已连接 ${cfg.owner}/${cfg.repo}`);
+      initApp();
+      setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+      return;
+    } catch (err) {
+      ghSetStatus('err', `GitHub 拉取失败：${err.message}`);
+      showToast('⚠️ GitHub 拉取失败，改用本地文件…');
+    }
+  }
+  // Fallback: load from same-origin files (works on GitHub Pages)
+  ghSetStatus('idle', '未配置 GitHub 同步');
+  try {
+    const [dR, pR, ptR] = await Promise.all([
+      fetch('districts.geojson').then(r => r.ok ? r.json() : null),
+      fetch('cluster.geojson').then(r => r.ok ? r.json() : null),
+      fetch('cluster_point.geojson').then(r => r.ok ? r.json() : null)
+    ]);
+    if (dR)  _DIST_DATA = dR;
+    if (pR)  _POLY_DATA = pR;
+    if (ptR) _PT_DATA   = ptR;
+  } catch (e) { /* graceful: initApp handles null */ }
+  initApp();
+  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+}
+
+// ── Pull latest from GitHub ──
+async function ghPullAll() {
+  const cfg = ghGetConfig(); if (!cfg) return;
+  ghSetStatus('warn', '正在拉取…');
+  try {
+    const [dR, pR, ptR] = await Promise.all([
+      ghFetchFile(cfg, 'districts.geojson'),
+      ghFetchFile(cfg, 'cluster.geojson'),
+      ghFetchFile(cfg, 'cluster_point.geojson')
+    ]);
+    _DIST_DATA = dR.json;  _ghSha.dist = dR.sha;
+    _POLY_DATA = pR.json;  _ghSha.poly = pR.sha;
+    _PT_DATA   = ptR.json; _ghSha.pt   = ptR.sha;
+    // Reload map layers
+    if (distLayerRef) { distGroup.removeLayer(distLayerRef); distLayerRef = null; }
+    polyFeats.forEach(cf => polyGroup.removeLayer(cf.glyr)); polyFeats = []; nextPolyId = 1;
+    ptFeats.forEach(pf => ptGroup.removeLayer(pf.marker));   ptFeats   = []; nextPtId   = 1;
+    if (_DIST_DATA) {
+      distLayerRef = L.geoJSON(_DIST_DATA, { style: () => ({ ...distStyle }),
+        onEachFeature: (f, lyr) => lyr.bindTooltip('<b>' + f.properties.county + '</b>', { sticky: true, className: 'd-tip' })
+      }).addTo(distGroup);
+    }
+    if (_POLY_DATA) _POLY_DATA.features.forEach(f => addPolyFeat(f, f.properties));
+    if (_PT_DATA)   _PT_DATA.features.forEach(f => addPtFeat(f, f.properties));
+    refreshDistLabels(); refreshPolyLabels(); refreshPtLabels(); updateStats();
+    ghSetStatus('ok', `已同步 ${cfg.owner}/${cfg.repo}`);
+    showToast('✅ 已从 GitHub 拉取最新数据');
+  } catch (err) {
+    ghSetStatus('err', `拉取失败：${err.message}`);
+    showToast('❌ 拉取失败：' + err.message);
+  }
+}
+
+// ── Push current data to GitHub ──
+async function ghPushAll() {
+  const cfg = ghGetConfig(); if (!cfg) return;
+  ghSetStatus('warn', '正在推送…');
+  try {
+    const polyGJ = {
+      type: 'FeatureCollection', name: '北京市城市更新综合化组团',
+      crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+      features: polyFeats.map(cf => ({ type: 'Feature', properties: { ...cf.props }, geometry: cf.layer.toGeoJSON().geometry }))
+    };
+    const ptGJ = {
+      type: 'FeatureCollection', name: '北京市城市更新综合化组团点',
+      crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+      features: ptFeats.map(pf => ({ type: 'Feature', properties: { ...pf.props }, geometry: { type: 'Point', coordinates: [pf.marker.getLatLng().lng, pf.marker.getLatLng().lat] } }))
+    };
+    const [polySha, ptSha] = await Promise.all([
+      ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly),
+      ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt)
+    ]);
+    _ghSha.poly = polySha; _ghSha.pt = ptSha;
+    ghSetStatus('ok', `已推送至 ${cfg.owner}/${cfg.repo}`);
+    showToast('✅ 数据已推送到 GitHub');
+  } catch (err) {
+    ghSetStatus('err', `推送失败：${err.message}`);
+    showToast('❌ 推送失败：' + err.message);
+  }
+}
+
+// ── Debounced silent auto-sync after every edit ──
+let _ghSyncTimer = null;
+function ghAutoSync() {
+  const cfg = ghGetConfig(); if (!cfg || !cfg.token) return;
+  clearTimeout(_ghSyncTimer);
+  _ghSyncTimer = setTimeout(async () => {
+    try {
+      const polyGJ = {
+        type: 'FeatureCollection', name: '北京市城市更新综合化组团',
+        crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+        features: polyFeats.map(cf => ({ type: 'Feature', properties: { ...cf.props }, geometry: cf.layer.toGeoJSON().geometry }))
+      };
+      const ptGJ = {
+        type: 'FeatureCollection', name: '北京市城市更新综合化组团点',
+        crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+        features: ptFeats.map(pf => ({ type: 'Feature', properties: { ...pf.props }, geometry: { type: 'Point', coordinates: [pf.marker.getLatLng().lng, pf.marker.getLatLng().lat] } }))
+      };
+      const [polySha, ptSha] = await Promise.all([
+        ghPutFile(cfg, 'cluster.geojson', polyGJ, _ghSha.poly),
+        ghPutFile(cfg, 'cluster_point.geojson', ptGJ, _ghSha.pt)
+      ]);
+      _ghSha.poly = polySha; _ghSha.pt = ptSha;
+      ghSetStatus('ok', '已自动同步至 GitHub');
+    } catch (err) {
+      ghSetStatus('err', `自动同步失败：${err.message}`);
+    }
+  }, 2000);
+}
+
+// ── Config Modal ──
+function openGhModal() {
+  const cfg = ghGetConfig() || {};
+  document.getElementById('gh-owner').value = cfg.owner || '';
+  document.getElementById('gh-repo').value  = cfg.repo  || '';
+  document.getElementById('gh-path').value  = cfg.path  || '';
+  document.getElementById('gh-token').value = cfg.token || '';
+  document.getElementById('gh-modal').classList.remove('hidden');
+}
+function closeGhModal() { document.getElementById('gh-modal').classList.add('hidden'); }
+async function ghSaveConfig() {
+  const cfg = {
+    owner: document.getElementById('gh-owner').value.trim(),
+    repo:  document.getElementById('gh-repo').value.trim(),
+    path:  document.getElementById('gh-path').value.trim(),
+    token: document.getElementById('gh-token').value.trim()
+  };
+  if (!cfg.owner || !cfg.repo || !cfg.token) { showToast('⚠️ 请填写用户名、仓库名和 Token'); return; }
+  localStorage.setItem(GH_CFG_KEY, JSON.stringify(cfg));
+  closeGhModal();
+  ghSetStatus('warn', '正在验证连接…');
+  try {
+    const r = await ghFetchFile(cfg, 'cluster.geojson');
+    _ghSha.poly = r.sha;
+    ghSetStatus('ok', `已连接 ${cfg.owner}/${cfg.repo}`);
+    showToast('✅ GitHub 连接成功');
+  } catch (err) {
+    ghSetStatus('err', `连接失败：${err.message}`);
+    showToast('❌ 连接失败，请检查仓库名、路径和 Token 权限');
+  }
+}
+function ghClearConfig() {
+  localStorage.removeItem(GH_CFG_KEY);
+  _ghSha = { dist: null, poly: null, pt: null };
+  closeGhModal();
+  ghSetStatus('idle', '未配置 GitHub 同步');
+  showToast('已清除 GitHub 配置');
+}
+
+
+// ══ BASEMAP ══
+const BASEMAPS={
+  'ofm':        {type:'vector',style:'https://tiles.openfreemap.org/styles/liberty'},
+  'esri-sat':   {type:'tile',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attr:'© Esri'},
+  'esri-topo':  {type:'tile',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',attr:'© Esri'},
+  'esri-street':{type:'tile',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',attr:'© Esri'},
+  'carto-light':{type:'tile',url:'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',attr:'© CartoDB'},
+  'carto-dark': {type:'tile',url:'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',attr:'© CartoDB'}
+};
+let currentBm='ofm';
+function switchBasemap(key){
+  if(basemapLayer){map.removeLayer(basemapLayer);basemapLayer=null;}
+  const bm=BASEMAPS[key];
+  if(bm.type==='vector'){
+    basemapLayer=L.maplibreGL({style:bm.style,attribution:'© OpenFreeMap © OSM'}).addTo(map);
+  }else{
+    basemapLayer=L.tileLayer(bm.url,{attribution:bm.attr,maxZoom:19}).addTo(map);
+    // Ensure tile layer is below other layers
+    if(basemapLayer.bringToBack)basemapLayer.bringToBack();
+  }
+  // Bring data layers to front
+  setTimeout(()=>{
+    if(distGroup)distGroup.bringToFront&&distGroup.eachLayer(l=>l.bringToFront&&l.bringToFront());
+    if(polyGroup)polyGroup.eachLayer&&polyGroup.eachLayer(l=>{if(l.bringToFront)l.bringToFront();});
+    if(ptGroup)ptGroup.eachLayer&&ptGroup.eachLayer(l=>{if(l.bringToFront)l.bringToFront();});
+  },300);
+  currentBm=key;
+  document.querySelectorAll('.bm-btn').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('bm-'+key);if(el)el.classList.add('active');
+}
+function toggleBmList(){document.getElementById('bm-list').classList.toggle('open');}
+
+// ══ HELPERS ══
+function nowStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function _gv(id){return document.getElementById(id).value;}
+function openPanel(){document.getElementById('panel').classList.add('open');document.getElementById('panel-overlay').classList.add('open');}
+function closePanel(){document.getElementById('panel').classList.remove('open');document.getElementById('panel-overlay').classList.remove('open');}
+function toggleSec(hdr){hdr.classList.toggle('open');hdr.nextElementSibling.classList.toggle('open');}
+let tbCollapsed=false;
+function toggleToolbar(){tbCollapsed=!tbCollapsed;document.getElementById('toolbar-wrap').classList.toggle('collapsed',tbCollapsed);}
+
+// ══ LAYER TOGGLE ══
+function toggleLayer(name,on){
+  const grp={dist:distGroup,poly:polyGroup,pt:ptGroup,distL:distLabelLayer,polyL:polyLabelLayer,ptL:ptLabelLayer};
+  if(name==='dist'){[distGroup,distLabelLayer].forEach(g=>{on?g.addTo(map):map.removeLayer(g);});}
+  else if(name==='poly'){[polyGroup,polyLabelLayer].forEach(g=>{on?g.addTo(map):map.removeLayer(g);});}
+  else if(name==='pt'){[ptGroup,ptLabelLayer].forEach(g=>{on?g.addTo(map):map.removeLayer(g);});}
+}
+
+// ══ ACTIVE LAYER ══
+function setActiveLayer(name){
+  activeLayer=name;
+  document.getElementById('tab-poly').classList.toggle('active',name==='poly');
+  document.getElementById('tab-pt').classList.toggle('active',name==='pt');
+}
+
+// ══ STYLES ══
+function applyDistStyle(){
+  distStyle={fillColor:_gv('df-c'),fillOpacity:+_gv('df-o'),color:_gv('dl-c'),weight:+_gv('dl-w')};
+  if(distLayerRef)distLayerRef.setStyle(()=>({...distStyle}));
+}
+function applyPolyStyle(){
+  polyStyle={fillColor:_gv('pf-c'),fillOpacity:+_gv('pf-o'),color:_gv('pl-c'),weight:+_gv('pl-w')};
+  polyFeats.forEach(cf=>cf.glyr.setStyle({...polyStyle}));
+}
+function applyPtStyle(){
+  ptStyle={color:_gv('pt-c'),size:+_gv('pt-s'),borderColor:_gv('pt-bc'),borderWidth:+_gv('pt-bw')};
+  ptFeats.forEach(pf=>updatePtMarkerStyle(pf));
+}
+function updatePtMarkerStyle(pf){
+  const s=ptStyle;const el=pf.marker.getElement();
+  if(el){
+    const hit=Math.max(s.size+16,28);
+    const wrap=el.querySelector('div');
+    if(wrap){wrap.style.width=hit+'px';wrap.style.height=hit+'px';}
+    const inner=el.querySelector('.pt-icon');
+    if(inner){inner.style.width=s.size+'px';inner.style.height=s.size+'px';inner.style.background=s.color;inner.style.borderColor=s.borderColor;inner.style.borderWidth=s.borderWidth+'px';}
+    pf.marker.setIcon(makePtIcon());
+  }
+}
+function makePtIcon(){
+  const s=ptStyle;
+  const hit=Math.max(s.size+16,28); // transparent hit area for easy clicking
+  const off=(hit-s.size)/2;
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:${hit}px;height:${hit}px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><div class="pt-icon" style="width:${s.size}px;height:${s.size}px;background:${s.color};border:${s.borderWidth}px solid ${s.borderColor};border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:pointer;transition:transform .15s;pointer-events:none;"></div></div>`,
+    iconSize:[hit,hit],iconAnchor:[hit/2,hit/2]
+  });
+}
+
+// ══ LABELS ══
+function getLabelCSS(pref){
+  const color=document.getElementById(pref+'-tc').value;
+  const size=document.getElementById(pref+'-ts').value;
+  const weight=document.getElementById(pref+'-tw').value;
+  const buf=document.getElementById(pref+'-buf').checked;
+  let css=`color:${color};font-size:${size}px;font-weight:${weight};white-space:nowrap;line-height:1.2;`;
+  if(buf){
+    const bc=document.getElementById(pref+'-bc').value;
+    const bo=document.getElementById(pref+'-bo').value;
+    const br=document.getElementById(pref+'-br').value;
+    const hex=bc.replace('#','');
+    const r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b2=parseInt(hex.substr(4,2),16);
+    css+=`background:rgba(${r},${g},${b2},${bo});border-radius:${br}px;padding:2px ${Math.round(+br*1.5)}px;`;
+  }else{css+='text-shadow:0 0 4px rgba(0,0,0,.9),0 1px 3px rgba(0,0,0,1);';}
+  return css;
+}
+function makeLabel(text,pref){
+  const css=getLabelCSS(pref);
+  return L.divIcon({className:'map-lbl',html:`<span style="${css}">${text}</span>`,iconSize:[0,0],iconAnchor:[0,0]});
+}
+function refreshDistLabels(){
+  if(!distLabelLayer||!distLayerRef)return;
+  distLabelLayer.clearLayers();
+  const f=_gv('dist-lbl-f');if(!f)return;
+  distLayerRef.eachLayer(l=>{
+    const v=l.feature.properties[f];if(!v)return;
+    L.marker(l.getBounds().getCenter(),{icon:makeLabel(v,'dl'),interactive:false}).addTo(distLabelLayer);
+  });
+}
+function refreshPolyLabels(){
+  if(!polyLabelLayer)return;
+  polyLabelLayer.clearLayers();
+  const f=_gv('poly-lbl-f');if(!f)return;
+  polyFeats.forEach(cf=>{
+    const v=cf.props[f];if(!v)return;
+    L.marker(cf.layer.getBounds().getCenter(),{icon:makeLabel(v,'pl'),interactive:false}).addTo(polyLabelLayer);
+  });
+}
+function refreshPtLabels(){
+  if(!ptLabelLayer)return;
+  ptLabelLayer.clearLayers();
+  const f=_gv('pt-lbl-f');if(!f)return;
+  const s=ptStyle.size/2;
+  ptFeats.forEach(pf=>{
+    const v=pf.props[f];if(!v)return;
+    const css=getLabelCSS('ptl');
+    const icon=L.divIcon({className:'map-lbl',html:`<span style="${css};margin-left:${s+4}px;">${v}</span>`,iconSize:[0,0],iconAnchor:[0,0]});
+    L.marker(pf.marker.getLatLng(),{icon,interactive:false}).addTo(ptLabelLayer);
+  });
+}
+
+// ══ STATS ══
+function updateStats(){
+  document.getElementById('stat-poly').textContent=polyFeats.length;
+  document.getElementById('stat-pt').textContent=ptFeats.length;
+}
+
+// ══ POLYGON FEATS ══
+function addPolyFeat(geojson,props){
+  const id=nextPolyId++;
+  let actualLyr=null;
+  const glyr=L.geoJSON(geojson,{
+    style:{...polyStyle},
+    onEachFeature:(f,lyr)=>{
+      actualLyr=lyr;
+      lyr.on('click',e=>{L.DomEvent.stopPropagation(e);
+        if(editMode==='move-poly')doMovePolyClick(id,lyr,e);
+        else showInfo('poly',id);
+      });
+      lyr.on('mouseover',()=>lyr.setStyle({fillOpacity:Math.min(polyStyle.fillOpacity+0.18,1),weight:polyStyle.weight+1}));
+      lyr.on('mouseout',()=>lyr.setStyle({...polyStyle}));
+    }
+  }).addTo(polyGroup);
+  if(!actualLyr)glyr.eachLayer(l=>{actualLyr=l;});
+  const cf={id,glyr,layer:actualLyr,props:{...props},geojson};
+  polyFeats.push(cf);updateStats();
+  return cf;
+}
+
+// ══ POINT FEATS ══
+function addPtFeat(geojson,props){
+  const id=nextPtId++;
+  const latlng=geojson.geometry?[geojson.geometry.coordinates[1],geojson.geometry.coordinates[0]]:(geojson.coordinates?[geojson.coordinates[1],geojson.coordinates[0]]:[40.1,116.4]);
+  const marker=L.marker(latlng,{icon:makePtIcon(),draggable:false}).addTo(ptGroup);
+  marker.on('click',e=>{L.DomEvent.stopPropagation(e);
+    if(editMode==='move-pt')doMovePtMarker(id,marker);
+    else showInfo('pt',id);
+  });
+  const pf={id,marker,props:{...props}};
+  ptFeats.push(pf);updateStats();
+  return pf;
+}
+
+// ══ EDIT MODES ══
+function setActiveBtn(id){
+  ['btn-draw','btn-reshape','btn-move','btn-del'].forEach(b=>document.getElementById(b).classList.remove('active'));
+  if(id)document.getElementById(id).classList.add('active');
+}
+function showBanner(txt,color){const el=document.getElementById('mode-banner');el.textContent=txt;el.style.display='block';el.style.background=color||'rgba(79,142,247,.92)';}
+function hideBanner(){document.getElementById('mode-banner').style.display='none';}
+
+// Draw
+function startDraw(){
+  if(!requireAdmin())return;
+  stopEditing(false);
+  if(activeLayer==='poly'){
+    editMode='draw-poly';setActiveBtn('btn-draw');
+    document.getElementById('draw-hint').style.display='block';
+    const h=new L.Draw.Polygon(map,{shapeOptions:{...polyStyle},showLength:true});
+    h.enable();
+    map.once('draw:created',e=>{
+      document.getElementById('draw-hint').style.display='none';
+      const gj=e.layer.toGeoJSON();
+      showConfirm('➕','确认添加新组团面？','绘制完成，是否填写属性并保存？',()=>{
+        editMode=null;setActiveBtn(null);
+        openPolyModal(null,props=>{const cf=addPolyFeat(gj,props);map.fitBounds(cf.layer.getBounds(),{maxZoom:14,padding:[80,80]});refreshPolyLabels();showToast('✅ 组团面已添加');});
+      },()=>{editMode=null;setActiveBtn(null);showToast('已取消');});
+    });
+  } else {
+    editMode='draw-pt';setActiveBtn('btn-draw');
+    showBanner('📍 点击地图放置组团点','rgba(245,158,11,.92)');
+    map.once('click',e=>{
+      showConfirm('📍','确认在此处添加组团点？','',()=>{
+        editMode=null;setActiveBtn(null);hideBanner();
+        const gj={type:'Feature',properties:{},geometry:{type:'Point',coordinates:[e.latlng.lng,e.latlng.lat]}};
+        openPtModal(null,props=>{const pf=addPtFeat(gj,props);refreshPtLabels();showToast('✅ 组团点已添加');});
+      },()=>{editMode=null;setActiveBtn(null);hideBanner();showToast('已取消');});
+    });
+  }
+}
+
+// Edit shape (polygon only)
+function startEdit(){
+  if(!requireAdmin())return;
+  stopEditing(false);
+  if(activeLayer!=='poly'){showToast('形状编辑仅支持组团面图层');return;}
+  if(!polyFeats.length){showToast('暂无组团面要素');return;}
+  editMode='edit-poly';setActiveBtn('btn-reshape');
+  showBanner('⬡ 形状编辑 — 拖动顶点，点击「完成」保存','rgba(79,142,247,.92)');
+  polyFeats.forEach(cf=>{if(cf.layer.editing)cf.layer.editing.enable();});
+}
+
+// Move
+let _moveSelId=null,_moveSelLyr=null,_moveSelType=null;
+function startMove(){
+  if(!requireAdmin())return;
+  stopEditing(false);
+  editMode=(activeLayer==='poly')?'move-poly':'move-pt';
+  setActiveBtn('btn-move');
+  if(activeLayer==='pt'){
+    ptFeats.forEach(pf=>{
+      pf.marker.dragging&&pf.marker.dragging.enable();
+      pf.marker.options.draggable=true;
+      pf.marker.on('dragend',_onPtDragEnd);
+    });
+    showBanner('✥ 平移模式 — 直接拖动组团点，或点击选择后再点目标位置','rgba(45,212,191,.92)');
+  } else {
+    showBanner('✥ 点击选择要平移的组团面','rgba(45,212,191,.92)');
+  }
+}
+function _onPtDragEnd(e){
+  const marker=e.target;
+  const pf=ptFeats.find(p=>p.marker===marker);
+  if(pf){refreshPtLabels();showToast('✅ 组团点已平移');}
+}
+function doMovePolyClick(id,lyr,e){
+  if(_moveSelId!==null)return;
+  _moveSelId=id;_moveSelLyr=lyr;_moveSelType='poly';
+  lyr.setStyle({fillOpacity:Math.min(polyStyle.fillOpacity+0.25,1),weight:polyStyle.weight+2,dashArray:'6,4'});
+  showBanner('✥ 已选中 — 点击目标位置完成平移（右键取消）','rgba(245,158,11,.95)');
+  const overlay=document.createElement('div');
+  overlay.id='move-overlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:750;cursor:crosshair;';
+  overlay.addEventListener('click',ev=>{
+    overlay.remove();if(_moveSelId===null)return;
+    const rect=map.getContainer().getBoundingClientRect();
+    const destLL=map.containerPointToLatLng(L.point(ev.clientX-rect.left,ev.clientY-rect.top));
+    shiftPoly(_moveSelId,_moveSelLyr,destLL);
+    _moveSelId=null;_moveSelLyr=null;_moveSelType=null;
+    showBanner('✥ 点击选择要平移的组团面','rgba(45,212,191,.92)');
+  });
+  overlay.addEventListener('contextmenu',ev=>{
+    ev.preventDefault();overlay.remove();
+    if(_moveSelLyr)_moveSelLyr.setStyle({...polyStyle,dashArray:null});
+    _moveSelId=null;_moveSelLyr=null;_moveSelType=null;
+    showBanner('✥ 点击选择要平移的组团面','rgba(45,212,191,.92)');showToast('已取消');
+  });
+  document.body.appendChild(overlay);
+}
+function shiftPoly(id,lyr,destLL){
+  const oldCtr=lyr.getBounds().getCenter();
+  const dlat=destLL.lat-oldCtr.lat,dlng=destLL.lng-oldCtr.lng;
+  function shiftRings(rings){
+    return rings.map(ring=>{
+      if(Array.isArray(ring[0]))return shiftRings(ring);
+      return ring.map(ll=>L.latLng(ll.lat+dlat,ll.lng+dlng));
+    });
+  }
+  lyr.setLatLngs(shiftRings(lyr.getLatLngs()));
+  lyr.setStyle({...polyStyle,dashArray:null});lyr.redraw();
+  const cf=polyFeats.find(c=>c.id===id);if(cf)cf.geojson=cf.layer.toGeoJSON();
+  refreshPolyLabels();showToast('✅ 组团面已平移');
+}
+function doMovePtMarker(id,marker){
+  if(_moveSelId!==null){
+    // clicking another pt while one is selected: switch selection
+    const prev=ptFeats.find(p=>p.id===_moveSelId);
+    if(prev){const el=prev.marker.getElement();if(el){const dot=el.querySelector('.pt-icon');if(dot)dot.style.outline='';}}
+    const ov=document.getElementById('move-overlay');if(ov)ov.remove();
+    _moveSelId=null;_moveSelType=null;
+  }
+  _moveSelId=id;_moveSelType='pt';
+  // Highlight selected marker
+  const el=marker.getElement();if(el){const dot=el.querySelector('.pt-icon');if(dot)dot.style.outline='3px solid #f59e0b';}
+  showBanner('✥ 已选中组团点 — 拖动它 或 点击目标位置完成平移（右键取消）','rgba(245,158,11,.95)');
+  const overlay=document.createElement('div');
+  overlay.id='move-overlay';
+  overlay.style.cssText='position:fixed;inset:0;z-index:600;cursor:crosshair;pointer-events:none;';
+  // Re-enable pointer-events on the marker itself so it can still be dragged
+  overlay.addEventListener('click',ev=>{
+    if(_moveSelId===null)return;
+    const rect=map.getContainer().getBoundingClientRect();
+    const destLL=map.containerPointToLatLng(L.point(ev.clientX-rect.left,ev.clientY-rect.top));
+    marker.setLatLng(destLL);
+    const dot2=marker.getElement()&&marker.getElement().querySelector('.pt-icon');if(dot2)dot2.style.outline='';
+    overlay.remove();
+    _moveSelId=null;_moveSelType=null;
+    refreshPtLabels();showToast('✅ 组团点已平移');
+    showBanner('✥ 平移模式 — 直接拖动组团点，或点击选择后再点目标位置','rgba(45,212,191,.92)');
+  });
+  overlay.addEventListener('contextmenu',ev=>{
+    ev.preventDefault();overlay.remove();
+    const dot3=marker.getElement()&&marker.getElement().querySelector('.pt-icon');if(dot3)dot3.style.outline='';
+    _moveSelId=null;_moveSelType=null;
+    showBanner('✥ 平移模式 — 直接拖动组团点，或点击选择后再点目标位置','rgba(45,212,191,.92)');showToast('已取消');
+  });
+  document.body.appendChild(overlay);
+}
+
+// Delete
+function startDelete(){
+  if(!requireAdmin())return;
+  stopEditing(false);
+  const total=(activeLayer==='poly'?polyFeats.length:ptFeats.length);
+  if(!total){showToast('暂无要素可删除');return;}
+  editMode=(activeLayer==='poly')?'delete-poly':'delete-pt';
+  setActiveBtn('btn-del');
+  showBanner('🗑 点击要删除的'+(activeLayer==='poly'?'组团面':'组团点'),'rgba(244,63,94,.9)');
+  if(activeLayer==='poly'){
+    polyFeats.forEach(cf=>{
+      cf.layer.once('click',e=>{
+        L.DomEvent.stopPropagation(e);
+        const name=cf.props['组团名称']||cf.props['组团编号']||'未命名';
+        showConfirm('🗑','确认删除？',`即将删除「${name}」`,()=>{deletePolyFeat(cf.id);editMode=null;setActiveBtn(null);hideBanner();},()=>{editMode=null;setActiveBtn(null);hideBanner();});
+      });
+    });
+  } else {
+    ptFeats.forEach(pf=>{
+      pf.marker.once('click',e=>{
+        L.DomEvent.stopPropagation(e);
+        const name=pf.props['组团名称']||pf.props['组团编号']||'未命名';
+        showConfirm('🗑','确认删除？',`即将删除「${name}」`,()=>{deletePtFeat(pf.id);editMode=null;setActiveBtn(null);hideBanner();},()=>{editMode=null;setActiveBtn(null);hideBanner();});
+      });
+    });
+  }
+}
+function stopEditing(notify=true){
+  document.getElementById('draw-hint').style.display='none';hideBanner();setActiveBtn(null);
+  const ov=document.getElementById('move-overlay');if(ov)ov.remove();
+  _moveSelId=null;_moveSelType=null;
+  if(_moveSelLyr){_moveSelLyr.setStyle({...polyStyle,dashArray:null});_moveSelLyr=null;}
+  const wasEditPoly=editMode==='edit-poly';
+  // Disable pt dragging when leaving move-pt mode
+  if(editMode==='move-pt'){
+    ptFeats.forEach(pf=>{
+      pf.marker.dragging&&pf.marker.dragging.disable();
+      pf.marker.off('dragend',_onPtDragEnd);
+    });
+  }
+  editMode=null;
+  polyFeats.forEach(cf=>{
+    if(cf.layer.editing&&cf.layer.editing.enabled()){
+      cf.layer.editing.disable();cf.geojson=cf.layer.toGeoJSON();
+    }
+  });
+  if(wasEditPoly&&notify){
+    showConfirm('💾','保存形状修改？','确认保存所有形状变更',()=>showToast('✅ 形状已保存'),()=>showToast('已取消'));
+  }
+}
+function deletePolyFeat(id){
+  const idx=polyFeats.findIndex(c=>c.id===id);if(idx===-1)return;
+  const cf=polyFeats[idx];
+  polyGroup.removeLayer(cf.glyr);if(map.hasLayer(cf.glyr))map.removeLayer(cf.glyr);
+  polyFeats.splice(idx,1);updateStats();refreshPolyLabels();closeInfoModal();showToast('🗑 组团面已删除');ghAutoSync();
+}
+function deletePtFeat(id){
+  const idx=ptFeats.findIndex(p=>p.id===id);if(idx===-1)return;
+  const pf=ptFeats[idx];
+  ptGroup.removeLayer(pf.marker);if(map.hasLayer(pf.marker))map.removeLayer(pf.marker);
+  ptFeats.splice(idx,1);updateStats();refreshPtLabels();closeInfoModal();showToast('🗑 组团点已删除');ghAutoSync();
+}
+
+// ══ POLYGON MODAL ══
+function openPolyModal(id,cb){
+  _polyAttrId=id;_polyAttrCb=cb;
+  const edit=id!==null;
+  document.getElementById('pm-ico').textContent=edit?'✏️':'➕';
+  document.getElementById('pm-ttl').textContent=edit?'编辑组团面属性':'新建组团面属性';
+  const now=nowStr(),uname=currentUser?currentUser.displayName:'—';
+  if(edit){
+    const cf=polyFeats.find(c=>c.id===id);
+    if(cf){
+      const p=cf.props;
+      document.getElementById('pm-id').value=p['组团编号']||'';
+      document.getElementById('pm-name').value=p['组团名称']||'';
+      document.getElementById('pm-dist').value=p['所属行政区']||'';
+      document.getElementById('pm-town').value=p['属地乡镇街道管委会']||'';
+      document.getElementById('pm-confirmed').value=p['区政府是否已确认']||'';
+      document.getElementById('pm-stable').value=p['范围是否稳定']||'';
+      document.getElementById('pm-cu').value=p['创建用户']||'';
+      document.getElementById('pm-ct').value=p['创建时间']||'';
+      document.getElementById('pm-mu').value=uname;
+      document.getElementById('pm-mt').value=now;
+    }
+  }else{
+    ['pm-id','pm-name','pm-town'].forEach(x=>document.getElementById(x).value='');
+    ['pm-dist','pm-confirmed','pm-stable'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('pm-cu').value=uname;
+    document.getElementById('pm-ct').value=now;
+    document.getElementById('pm-mu').value='';document.getElementById('pm-mt').value='';
+  }
+  document.getElementById('poly-modal').classList.add('active');
+}
+function savePolyAttr(){
+  const fid=_gv('pm-id').trim();if(!fid){showToast('⚠️ 组团编号不能为空');return;}
+  const now=nowStr(),uname=currentUser?currentUser.displayName:'—';
+  const props={'组团编号':fid,'组团名称':_gv('pm-name'),'所属行政区':_gv('pm-dist'),
+    '属地乡镇街道管委会':_gv('pm-town'),'区政府是否已确认':_gv('pm-confirmed'),'范围是否稳定':_gv('pm-stable')};
+  if(_polyAttrId!==null){
+    const cf=polyFeats.find(c=>c.id===_polyAttrId);
+    if(cf){props['创建用户']=cf.props['创建用户']||uname;props['创建时间']=cf.props['创建时间']||now;props['修改用户']=uname;props['修改时间']=now;cf.props={...props};}
+    updateStats();refreshPolyLabels();showToast('✅ 属性已保存');
+  }else if(_polyAttrCb){props['创建用户']=uname;props['创建时间']=now;props['修改用户']='';props['修改时间']='';_polyAttrCb(props);}
+  closePolyModal();closeInfoModal();
+  ghAutoSync();
+}
+function closePolyModal(){document.getElementById('poly-modal').classList.remove('active');_polyAttrCb=null;_polyAttrId=null;}
+document.getElementById('poly-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closePolyModal();});
+
+// ══ POINT MODAL ══
+function openPtModal(id,cb){
+  _ptAttrId=id;_ptAttrCb=cb;
+  const edit=id!==null;
+  document.getElementById('ptm-ico').textContent=edit?'✏️':'📍';
+  document.getElementById('ptm-ttl').textContent=edit?'编辑组团点属性':'新建组团点属性';
+  const now=nowStr(),uname=currentUser?currentUser.displayName:'—';
+  if(edit){
+    const pf=ptFeats.find(p=>p.id===id);
+    if(pf){
+      const p=pf.props;
+      ['ptm-id','ptm-name','ptm-rname','ptm-team','ptm-leader','ptm-phone'].forEach(x=>{
+        const key={'ptm-id':'组团编号','ptm-name':'组团名称','ptm-rname':'上报名称','ptm-team':'技术团队','ptm-leader':'技术团队负责人','ptm-phone':'技术团队联系方式'}[x];
+        document.getElementById(x).value=p[key]||'';
+      });
+      document.getElementById('ptm-tracker').value=p['跟踪人']||'';
+      ['1','2','3'].forEach(n=>{
+        document.getElementById('ptm-p'+n).value=p['谋划'+n+'.0-工作进度']||(n==='3'?p['片区策划-工作进度']||'':'');
+        document.getElementById('ptm-d'+n).value=p['谋划'+n+'.0-资料提交时间']||p['谋划'+n+'.0-资料收集时间']||p['片区策划-资料收集时间']||'';
+        document.getElementById('ptm-n'+n).value=p['谋划'+n+'.0-状态备注']||p['片区策划-状态备注']||'';
+      });
+      // fix p3 which is 片区策划
+      document.getElementById('ptm-p3').value=p['片区策划-工作进度']||'';
+      document.getElementById('ptm-d3').value=p['片区策划-资料收集时间']||'';
+      document.getElementById('ptm-n3').value=p['片区策划-状态备注']||'';
+      document.getElementById('ptm-cu').value=p['创建用户']||'';
+      document.getElementById('ptm-ct').value=p['创建时间']||'';
+      document.getElementById('ptm-mu').value=uname;document.getElementById('ptm-mt').value=now;
+    }
+  }else{
+    ['ptm-id','ptm-name','ptm-rname','ptm-team','ptm-leader','ptm-phone','ptm-n1','ptm-n2','ptm-n3'].forEach(x=>document.getElementById(x).value='');
+    ['ptm-tracker','ptm-p1','ptm-p2','ptm-p3'].forEach(x=>document.getElementById(x).value='');
+    ['ptm-d1','ptm-d2','ptm-d3'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('ptm-cu').value=uname;document.getElementById('ptm-ct').value=now;
+    document.getElementById('ptm-mu').value='';document.getElementById('ptm-mt').value='';
+  }
+  document.getElementById('pt-modal').classList.add('active');
+}
+function savePtAttr(){
+  const fid=_gv('ptm-id').trim();if(!fid){showToast('⚠️ 组团编号不能为空');return;}
+  const now=nowStr(),uname=currentUser?currentUser.displayName:'—';
+  const props={
+    '组团编号':fid,'组团名称':_gv('ptm-name'),'上报名称':_gv('ptm-rname'),
+    '谋划1.0-工作进度':_gv('ptm-p1'),'谋划1.0-资料提交时间':_gv('ptm-d1'),'谋划1.0-状态备注':_gv('ptm-n1'),
+    '谋划2.0-工作进度':_gv('ptm-p2'),'谋划2.0-资料收集时间':_gv('ptm-d2'),'谋划2.0-状态备注':_gv('ptm-n2'),
+    '片区策划-工作进度':_gv('ptm-p3'),'片区策划-资料收集时间':_gv('ptm-d3'),'片区策划-状态备注':_gv('ptm-n3'),
+    '技术团队':_gv('ptm-team'),'技术团队负责人':_gv('ptm-leader'),'技术团队联系方式':_gv('ptm-phone'),
+    '跟踪人':_gv('ptm-tracker')
+  };
+  if(_ptAttrId!==null){
+    const pf=ptFeats.find(p=>p.id===_ptAttrId);
+    if(pf){props['创建用户']=pf.props['创建用户']||uname;props['创建时间']=pf.props['创建时间']||now;props['修改用户']=uname;props['修改时间']=now;pf.props={...props};}
+    updateStats();refreshPtLabels();showToast('✅ 属性已保存');
+  }else if(_ptAttrCb){props['创建用户']=uname;props['创建时间']=now;props['修改用户']='';props['修改时间']='';_ptAttrCb(props);}
+  closePtModal();closeInfoModal();
+  ghAutoSync();
+}
+function closePtModal(){document.getElementById('pt-modal').classList.remove('active');_ptAttrCb=null;_ptAttrId=null;}
+document.getElementById('pt-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closePtModal();});
+
+// ══ INFO MODAL ══
+const PROGRESS_CLR={'尚未启动':'#6366f1','初步谋划':'#3b82f6','已提交成果':'#10b981','进一步优化':'#f59e0b','撤销':'#ef4444'};
+function irow(k,v,big){return `<div class="i-row"><span class="i-key">${k}</span><span class="i-val"${big?' style="color:#f59e0b;font-size:15px;font-weight:700;"':''}>${v||'—'}</span></div>`;}
+function progressBadge(v){const c=PROGRESS_CLR[v]||'#64748b';return v?`<span class="badge" style="background:${c}20;color:${c};">${v}</span>`:'';}
+
+function showInfo(type,id){
+  _infoId=id;_infoType=type;
+  let html='';
+  document.getElementById('info-modal-title').innerHTML=(type==='poly'?'🔷 组团面详情':'📍 组团点详情')+'<button class="m-close" onclick="closeInfoModal()">✕</button>';
+  if(type==='poly'){
+    const cf=polyFeats.find(c=>c.id===id);if(!cf)return;const p=cf.props;
+    html=irow('组团编号',`<b style="color:#93c5fd">${p['组团编号']}</b>`)+
+      irow('组团名称',p['组团名称'])+irow('所属行政区',p['所属行政区'])+
+      irow('属地乡镇街道',p['属地乡镇街道管委会'])+
+      irow('区政府已确认',p['区政府是否已确认'])+irow('范围是否稳定',p['范围是否稳定'])+
+      (p['创建用户']?irow('创建',`<span style="font-size:11px;color:var(--muted)">${p['创建用户']} · ${p['创建时间']}</span>`):'');
+  }else{
+    const pf=ptFeats.find(p=>p.id===id);if(!pf)return;const p=pf.props;
+    html=irow('组团编号',`<b style="color:#93c5fd">${p['组团编号']}</b>`)+
+      irow('组团名称',p['组团名称'])+irow('上报名称',p['上报名称'])+
+      irow('谋划1.0进度',progressBadge(p['谋划1.0-工作进度'])||'—')+
+      irow('谋划2.0进度',progressBadge(p['谋划2.0-工作进度'])||'—')+
+      irow('片区策划进度',progressBadge(p['片区策划-工作进度'])||'—')+
+      irow('技术团队',p['技术团队'])+irow('负责人',p['技术团队负责人'])+
+      irow('联系方式',p['技术团队联系方式'])+irow('跟踪人',`<b>${p['跟踪人']||'—'}</b>`)+
+      (p['创建用户']?irow('创建',`<span style="font-size:11px;color:var(--muted)">${p['创建用户']} · ${p['创建时间']}</span>`):'');
+  }
+  document.getElementById('info-content').innerHTML=html;
+  document.getElementById('info-modal').classList.add('active');
+}
+function editFromInfo(){
+  const id=_infoId,type=_infoType;closeInfoModal();
+  if(type==='poly')openPolyModal(id,null);else openPtModal(id,null);
+}
+function deleteFromInfo(){
+  if(_infoId===null)return;
+  const type=_infoType,id=_infoId;
+  const feats=type==='poly'?polyFeats:ptFeats;
+  const f=feats.find(x=>x.id===id);
+  const name=(type==='poly'?f.props['组团名称']:f&&f.props['组团名称'])||'该要素';
+  showConfirm('🗑','确认删除？',`即将删除「${name}」`,()=>{
+    if(type==='poly')deletePolyFeat(id);else deletePtFeat(id);
+  },null);
+}
+function closeInfoModal(){document.getElementById('info-modal').classList.remove('active');_infoId=null;_infoType=null;}
+document.getElementById('info-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeInfoModal();});
+
+// ══ CONFIRM ══
+function showConfirm(icon,msg,sub,okCb,cancelCb){
+  _confirmCb={ok:okCb,cancel:cancelCb};
+  document.getElementById('confirm-icon').textContent=icon;
+  document.getElementById('confirm-msg').textContent=msg;
+  document.getElementById('confirm-sub').textContent=sub||'';
+  document.getElementById('confirm-modal').classList.add('active');
+}
+function confirmOK(){document.getElementById('confirm-modal').classList.remove('active');if(_confirmCb&&_confirmCb.ok)_confirmCb.ok();_confirmCb=null;}
+function confirmCancel(){document.getElementById('confirm-modal').classList.remove('active');if(_confirmCb&&_confirmCb.cancel)_confirmCb.cancel();_confirmCb=null;}
+document.getElementById('confirm-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)confirmCancel();});
+
+// ══ TOAST ══
+function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2400);}
+
+// ══ UPLOAD GEOJSON ══
+function uploadGeoJSON(layerType, input){
+  if(!requireAdmin())return;
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    let gj;
+    try{gj=JSON.parse(e.target.result);}catch(err){showToast('❌ 文件解析失败，请确认为有效GeoJSON');input.value='';return;}
+    if(!gj.features){showToast('❌ 无效的GeoJSON（缺少features）');input.value='';return;}
+    showConfirm('📂',`确认替换${layerType==='poly'?'组团面':'组团点'}数据？`,
+      `将清空现有${gj.features.length}个要素并加载新文件中的数据`,
+      ()=>{
+        if(layerType==='poly'){
+          polyFeats.forEach(cf=>{polyGroup.removeLayer(cf.glyr);if(map.hasLayer(cf.glyr))map.removeLayer(cf.glyr);});
+          polyFeats=[];nextPolyId=1;
+          gj.features.forEach(f=>addPolyFeat(f,f.properties||{}));
+          refreshPolyLabels();
+        }else{
+          ptFeats.forEach(pf=>{ptGroup.removeLayer(pf.marker);if(map.hasLayer(pf.marker))map.removeLayer(pf.marker);});
+          ptFeats=[];nextPtId=1;
+          gj.features.forEach(f=>addPtFeat(f,f.properties||{}));
+          refreshPtLabels();
+        }
+        updateStats();
+        showToast(`✅ 已成功加载 ${gj.features.length} 个要素`);
+      },null);
+    input.value='';
+  };
+  reader.readAsText(file,'utf-8');
+}
+
+// ══ DOWNLOAD ══
+function dlPoly(){
+  if(!requireAdmin())return;
+  const feats=polyFeats.map(cf=>({type:'Feature',properties:{...cf.props},geometry:cf.layer.toGeoJSON().geometry}));
+  dlJSON({type:'FeatureCollection',name:'北京市城市更新综合化组团面',crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},features:feats},'cluster.geojson');
+}
+function dlPt(){
+  if(!requireAdmin())return;
+  const feats=ptFeats.map(pf=>({type:'Feature',properties:{...pf.props},geometry:{type:'Point',coordinates:[pf.marker.getLatLng().lng,pf.marker.getLatLng().lat]}}));
+  dlJSON({type:'FeatureCollection',name:'北京市城市更新综合化组团点',crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},features:feats},'cluster_point.geojson');
+}
+function dlDist(){dlJSON(_DIST_DATA,'districts.geojson');}
+function dlJSON(obj,name){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));a.download=name;a.click();}
+
+</script>
+
+<!-- ── GitHub Config Modal ── -->
+<div class="gh-modal-wrap hidden" id="gh-modal">
+  <div class="gh-box">
+    <h3>☁️ GitHub 数据同步配置</h3>
+    <p class="gh-sub">配置后，登录时自动从 GitHub 拉取最新数据；每次保存/删除要素后自动推送。<br>Token 仅保存在本地浏览器中，不会上传到任何服务器。</p>
+    <div class="gh-field">
+      <label>GitHub 用户名 / 组织名</label>
+      <input id="gh-owner" placeholder="例如：your-username" autocomplete="off"/>
+    </div>
+    <div class="gh-field">
+      <label>仓库名称</label>
+      <input id="gh-repo" placeholder="例如：beijing-urban-renewal" autocomplete="off"/>
+    </div>
+    <div class="gh-field">
+      <label>数据文件夹路径（留空表示仓库根目录）</label>
+      <input id="gh-path" placeholder="例如：data（或留空）" autocomplete="off"/>
+      <div class="gh-hint">三个 GeoJSON 文件所在的路径，留空则为根目录</div>
+    </div>
+    <div class="gh-field">
+      <label>Personal Access Token（需要 Contents 读写权限）</label>
+      <input id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password"/>
+      <div class="gh-hint">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens，勾选仓库的 Contents → Read and write</div>
+    </div>
+    <div class="gh-modal-btns">
+      <button class="btn btn-blue" onclick="ghSaveConfig()">✅ 保存并验证连接</button>
+      <button class="btn btn-ghost" onclick="ghClearConfig()">🗑 清除配置</button>
+      <button class="btn btn-ghost" onclick="closeGhModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
