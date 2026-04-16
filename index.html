@@ -764,12 +764,24 @@ function ghHeaders(cfg) {
 }
 
 // Fetch a single file from GitHub, returns { json, sha }
+// Uses download_url for large files (>1MB GitHub API limit)
 async function ghFetchFile(cfg, filename) {
-  const res = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
-  if (!res.ok) throw new Error(`HTTP ${res.status} (${filename})`);
-  const data = await res.json();
-  const decoded = JSON.parse(atob(data.content.replace(/\n/g, '')));
-  return { json: decoded, sha: data.sha };
+  const metaRes = await fetch(ghApiUrl(cfg, filename), { headers: ghHeaders(cfg) });
+  if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status} (${filename})`);
+  const meta = await metaRes.json();
+  let decoded;
+  if (meta.content && meta.content.trim()) {
+    // Small file: use inline base64 content
+    decoded = JSON.parse(atob(meta.content.replace(/\n/g, '')));
+  } else if (meta.download_url) {
+    // Large file (>1MB): fetch raw content via download_url
+    const rawRes = await fetch(meta.download_url);
+    if (!rawRes.ok) throw new Error(`下载失败 HTTP ${rawRes.status} (${filename})`);
+    decoded = await rawRes.json();
+  } else {
+    throw new Error(`无法获取文件内容 (${filename})`);
+  }
+  return { json: decoded, sha: meta.sha };
 }
 
 // Write a file to GitHub (auto-fetches sha if missing)
