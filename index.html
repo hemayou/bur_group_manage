@@ -772,8 +772,12 @@ async function ghFetchFile(cfg, filename) {
   return { json: decoded, sha: data.sha };
 }
 
-// Write a file to GitHub
+// Write a file to GitHub (auto-fetches sha if missing)
 async function ghPutFile(cfg, filename, geoJSON, sha) {
+  // If sha unknown, fetch it first to avoid "sha wasn't supplied" error
+  if (!sha) {
+    try { const r = await ghFetchFile(cfg, filename); sha = r.sha; } catch (e) { /* new file */ }
+  }
   const body = JSON.stringify({
     message: `[地图同步] 更新 ${filename}`,
     content: btoa(unescape(encodeURIComponent(JSON.stringify(geoJSON, null, 2)))),
@@ -952,8 +956,14 @@ async function ghSaveConfig() {
   closeGhModal();
   ghSetStatus('warn', '正在验证连接…');
   try {
-    const r = await ghFetchFile(cfg, 'cluster.geojson');
-    _ghSha.poly = r.sha;
+    const [dR, pR, ptR] = await Promise.all([
+      ghFetchFile(cfg, 'districts.geojson').catch(() => null),
+      ghFetchFile(cfg, 'cluster.geojson'),
+      ghFetchFile(cfg, 'cluster_point.geojson')
+    ]);
+    if (dR)  _ghSha.dist = dR.sha;
+    _ghSha.poly = pR.sha;
+    _ghSha.pt   = ptR.sha;
     ghSetStatus('ok', `已连接 ${cfg.owner}/${cfg.repo}`);
     showToast('✅ GitHub 连接成功');
   } catch (err) {
