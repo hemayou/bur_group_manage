@@ -795,9 +795,13 @@ async function ghPutFile(cfg, filename, geoJSON, sha) {
   if (!sha) {
     try { const r = await ghFetchFile(cfg, filename); sha = r.sha; } catch (e) { /* new file */ }
   }
+  // Use TextEncoder for correct UTF-8 base64 encoding (supports Chinese characters)
+  const jsonStr = JSON.stringify(geoJSON, null, 2);
+  const utf8Bytes = new TextEncoder().encode(jsonStr);
+  const b64 = btoa(Array.from(utf8Bytes, b => String.fromCharCode(b)).join(''));
   const body = JSON.stringify({
     message: `[地图同步] 更新 ${filename}`,
-    content: btoa(unescape(encodeURIComponent(JSON.stringify(geoJSON, null, 2)))),
+    content: b64,
     ...(sha ? { sha } : {})
   });
   const res = await fetch(ghApiUrl(cfg, filename), {
