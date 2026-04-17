@@ -806,13 +806,11 @@ async function ghPutFile(cfg, filename, geoJSON, sha) {
       if (metaRes.ok) { const m = await metaRes.json(); sha = m.sha; }
     } catch (e) { /* new file, no sha needed */ }
   }
-  // Encode JSON to valid base64 (single-pass, handles Chinese + large files)
-  const jsonStr = JSON.stringify(geoJSON, null, 2);
-  const utf8Bytes = new TextEncoder().encode(jsonStr);
-  // Must encode ALL bytes in one btoa call - chunked encoding produces invalid padding
-  // Use reduce to build the binary string without stack overflow
-  const binaryStr = utf8Bytes.reduce((s, b) => s + String.fromCharCode(b), '');
-  const b64 = btoa(binaryStr);
+  // Convert to pure-ASCII JSON (escape non-ASCII as \uXXXX), then btoa
+  // This is the only 100% reliable approach: btoa only accepts ASCII strings
+  const jsonStr = JSON.stringify(geoJSON, null, 2)
+    .replace(/[^\x00-\x7F]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+  const b64 = btoa(jsonStr);
   const body = JSON.stringify({
     message: `[地图同步] 更新 ${filename}`,
     content: b64,
